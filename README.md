@@ -1,44 +1,53 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/bitwarden/brand/master/screenshots/apps-combo-logo.png" alt="Bitwarden" />
-</p>
-<p align="center">
-  <a href="https://github.com/bitwarden/clients/actions/workflows/build-browser.yml?query=branch:master" target="_blank">
-    <img src="https://github.com/bitwarden/clients/actions/workflows/build-browser.yml/badge.svg?branch=master" alt="Github Workflow browser build on master" />
-  </a>
-  <a href="https://github.com/bitwarden/clients/actions/workflows/build-cli.yml?query=branch:master" target="_blank">
-    <img src="https://github.com/bitwarden/clients/actions/workflows/build-cli.yml/badge.svg?branch=master" alt="Github Workflow CLI build on master" />
-  </a>
-  <a href="https://github.com/bitwarden/clients/actions/workflows/build-desktop.yml?query=branch:master" target="_blank">
-    <img src="https://github.com/bitwarden/clients/actions/workflows/build-desktop.yml/badge.svg?branch=master" alt="Github Workflow desktop build on master" />
-  </a>
-    <a href="https://github.com/bitwarden/clients/actions/workflows/build-web.yml?query=branch:master" target="_blank">
-    <img src="https://github.com/bitwarden/clients/actions/workflows/build-web.yml/badge.svg?branch=master" alt="Github Workflow web build on master" />
-  </a>
-  <a href="https://gitter.im/bitwarden/Lobby" target="_blank">
-    <img src="https://badges.gitter.im/bitwarden/Lobby.svg" alt="gitter chat" />
-  </a>
-</p>
+## Bitwarden Web Extension except it's been patched to *kind of* work on GNOME Web (Epiphany)
 
----
+I've tried in the past to run GNOME Web as my default browser, but I am very dependent on Bitwarden as my password manager, and having it just there one click away on Firefox is just too convenient for me to switch over to GNOME Web.
 
-# Bitwarden Client Applications
+As you probably already know, GNOME Web (technically) has WebExtensions support, if you enable it using the command line. After that, you can just install any extension you download from the internet. Except not really, because nothing really works. Which includes Bitwarden, that gives a weird error regarding an unimplemented API call upon trying to log in.
 
-This repository houses all Bitwarden client applications except the [Mobile application](https://github.com/bitwarden/mobile).
+I have looked around a bit and discovered that, all this API call is trying to do is to get the extension's version, and that's pretty much it. So, I removed the code that calls that API and just pasted the version number directly. And it somehow worked.
 
-Please refer to the [Clients section](https://contributing.bitwarden.com/getting-started/clients/) of the [Contributing Documentation](https://contributing.bitwarden.com/) for build instructions, recommended tooling, code style tips, and lots of other great information to get you started.
+From what I can tell, anything but the auto-fill function works, so you'll have to manually copy and paste your credentials. A bit of a bummer, but personally, I'll take it. (before some other problem appears and I eventually just switch over to Firefox again, of course)
 
-## Related projects:
+#### This repository only contains a fix for the web extension of Bitwarden, and that is only one file. No other clients have been touched.
 
-- [bitwarden/server](https://github.com/bitwarden/server): The core infrastructure backend (API, database, Docker, etc).
-- [bitwarden/mobile](https://github.com/bitwarden/mobile): The mobile app vault (iOS and Android).
-- [bitwarden/directory-connector](https://github.com/bitwarden/directory-connector): A tool for syncing a directory (AD, LDAP, Azure, G Suite, Okta) to an organization.
+### How to install
 
-# We're Hiring!
+Just go over to the Releases tab and download the .xpi file which you can install on GNOME Web.
 
-Interested in contributing in a big way? Consider joining our team! We're hiring for many positions. Please take a look at our [Careers page](https://bitwarden.com/careers/) to see what opportunities are [currently open](https://bitwarden.com/careers/#open-positions) as well as what it's like to work at Bitwarden.
+If your GNOME Web installation doesn't have WebExtensions support enabled, you'll have to enable it. I personally have it installed from the GNOME Nightly Flatpak repo. To enable that repo and install GNOME Web, you can use these commands:
 
-# Contribute
+```
+flatpak remote-add --if-not-exists gnome-nightly https://nightly.gnome.org/gnome-nightly.flatpakrepo
+flatpak install gnome-nightly org.gnome.Epiphany.Devel
+```
 
-Code contributions are welcome! Please commit any pull requests against the `master` branch. Learn more about how to contribute by reading the [Contributing Guidelines](https://contributing.bitwarden.com/contributing/). Check out the [Contributing Documentation](https://contributing.bitwarden.com/) for how to get started with your first contribution.
+After these are done, you can enable WebExtensions using this command:
 
-Security audits and feedback are welcome. Please open an issue or email us privately if the report is sensitive in nature. You can read our security policy in the [`SECURITY.md`](SECURITY.md) file.
+```
+flatpak run --command=gsettings org.gnome.Epiphany.Devel set org.gnome.Epiphany.web:/org/gnome/epiphany/web/ enable-webextensions true
+```
+
+After that is done, you can open GNOME Web, go to Settings, where you'll find a new tab called Extensions. You can install extensions using that.
+
+### I want to build it myself
+
+Great, you can just use the build instructions provided by Bitwarden themselves:
+
+https://contributing.bitwarden.com/getting-started/clients/
+
+https://contributing.bitwarden.com/getting-started/clients/browser/
+
+Or you can run these commands after running a git clone of this repo:
+
+```
+cd bitwarden-epiphany
+npm ci
+cd apps/browser
+npm run build
+```
+
+Then, just compress the build directory inside of the /apps/browser directory into a zip file, and change the extension from .zip to .xpi. There are more elegant ways of doing this, but this method just worked for me.
+
+#### Disclaimer
+
+This is of course not an official Bitwarden repository, and I have no involvement with Bitwarden. This is just a thing I wanted to share as I thought it could be useful.

@@ -122,7 +122,7 @@ export class BrowserApi {
   }
 
   static getApplicationVersion(): string {
-    return chrome.runtime.getManifest().version;
+    return "2023.7.1";
   }
 
   static async isPopupOpen(): Promise<boolean> {
