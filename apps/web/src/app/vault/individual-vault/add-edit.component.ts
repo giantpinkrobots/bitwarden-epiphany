@@ -1,10 +1,9 @@
+import { DatePipe } from "@angular/common";
 import { Component, OnDestroy, OnInit } from "@angular/core";
 
-import { DialogServiceAbstraction } from "@bitwarden/angular/services/dialog";
 import { AddEditComponent as BaseAddEditComponent } from "@bitwarden/angular/vault/components/add-edit.component";
 import { AuditService } from "@bitwarden/common/abstractions/audit.service";
 import { EventCollectionService } from "@bitwarden/common/abstractions/event/event-collection.service";
-import { TotpService } from "@bitwarden/common/abstractions/totp.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { EventType, ProductType } from "@bitwarden/common/enums";
@@ -18,9 +17,11 @@ import { SendApiService } from "@bitwarden/common/tools/send/services/send-api.s
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CollectionService } from "@bitwarden/common/vault/abstractions/collection.service";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
-import { PasswordRepromptService } from "@bitwarden/common/vault/abstractions/password-reprompt.service";
-import { CipherType } from "@bitwarden/common/vault/enums/cipher-type";
-import { LoginUriView } from "@bitwarden/common/vault/models/view/login-uri.view";
+import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
+import { CipherType } from "@bitwarden/common/vault/enums";
+import { Launchable } from "@bitwarden/common/vault/interfaces/launchable";
+import { DialogService } from "@bitwarden/components";
+import { PasswordRepromptService } from "@bitwarden/vault";
 
 @Component({
   selector: "app-vault-add-edit",
@@ -42,6 +43,15 @@ export class AddEditComponent extends BaseAddEditComponent implements OnInit, On
   protected totpInterval: number;
   protected override componentName = "app-vault-add-edit";
 
+  get fido2CredentialCreationDateValue(): string {
+    const dateCreated = this.i18nService.t("dateCreated");
+    const creationDate = this.datePipe.transform(
+      this.cipher?.login?.fido2Credentials?.[0]?.creationDate,
+      "short",
+    );
+    return `${dateCreated} ${creationDate}`;
+  }
+
   constructor(
     cipherService: CipherService,
     folderService: FolderService,
@@ -59,7 +69,8 @@ export class AddEditComponent extends BaseAddEditComponent implements OnInit, On
     logService: LogService,
     passwordRepromptService: PasswordRepromptService,
     sendApiService: SendApiService,
-    dialogService: DialogServiceAbstraction
+    dialogService: DialogService,
+    private datePipe: DatePipe,
   ) {
     super(
       cipherService,
@@ -76,7 +87,7 @@ export class AddEditComponent extends BaseAddEditComponent implements OnInit, On
       passwordRepromptService,
       organizationService,
       sendApiService,
-      dialogService
+      dialogService,
     );
   }
 
@@ -126,12 +137,12 @@ export class AddEditComponent extends BaseAddEditComponent implements OnInit, On
     if (this.editMode && this.showPasswordCount) {
       this.eventCollectionService.collect(
         EventType.Cipher_ClientToggledPasswordVisible,
-        this.cipherId
+        this.cipherId,
       );
     }
   }
 
-  launch(uri: LoginUriView) {
+  launch(uri: Launchable) {
     if (!uri.canLaunch) {
       return;
     }
@@ -148,7 +159,7 @@ export class AddEditComponent extends BaseAddEditComponent implements OnInit, On
     this.platformUtilsService.showToast(
       "info",
       null,
-      this.i18nService.t("valueCopied", this.i18nService.t(typeI18nKey))
+      this.i18nService.t("valueCopied", this.i18nService.t(typeI18nKey)),
     );
 
     if (this.editMode) {
@@ -159,7 +170,7 @@ export class AddEditComponent extends BaseAddEditComponent implements OnInit, On
       } else if (aType === "H_Field") {
         this.eventCollectionService.collect(
           EventType.Cipher_ClientCopiedHiddenField,
-          this.cipherId
+          this.cipherId,
         );
       }
     }

@@ -3,11 +3,14 @@
 export type SharedFlags = {
   multithreadDecryption: boolean;
   showPasswordless?: boolean;
+  enableCipherKeyEncryption?: boolean;
 };
 
 // required to avoid linting errors when there are no flags
 /* eslint-disable @typescript-eslint/ban-types */
-export type SharedDevFlags = {};
+export type SharedDevFlags = {
+  noopNotifications: boolean;
+};
 
 function getFlags<T>(envFlags: string | T): T {
   if (typeof envFlags === "string") {
@@ -42,7 +45,7 @@ export function devFlagEnabled<DevFlags extends SharedDevFlags>(flag: keyof DevF
   }
 
   const devFlags = getFlags<DevFlags>(process.env.DEV_FLAGS);
-  return devFlags[flag] == null || !!devFlags[flag];
+  return devFlags?.[flag] == null ? false : !!devFlags[flag];
 }
 
 /**
@@ -53,7 +56,7 @@ export function devFlagEnabled<DevFlags extends SharedDevFlags>(flag: keyof DevF
  * @throws Error if the flag is not enabled
  */
 export function devFlagValue<DevFlags extends SharedDevFlags>(
-  flag: keyof DevFlags
+  flag: keyof DevFlags,
 ): DevFlags[keyof DevFlags] {
   if (!devFlagEnabled(flag)) {
     throw new Error(`This method should not be called, it is protected by a disabled dev flag.`);

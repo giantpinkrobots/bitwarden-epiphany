@@ -2,8 +2,8 @@ import { Component, OnDestroy, OnInit } from "@angular/core";
 import { ActivatedRoute } from "@angular/router";
 import { BehaviorSubject, Subject, switchMap, takeUntil, tap } from "rxjs";
 
-import { OrganizationUserService } from "@bitwarden/common/abstractions/organization-user/organization-user.service";
-import { OrganizationUserResetPasswordDetailsResponse } from "@bitwarden/common/abstractions/organization-user/responses";
+import { OrganizationUserService } from "@bitwarden/common/admin-console/abstractions/organization-user/organization-user.service";
+import { OrganizationUserResetPasswordDetailsResponse } from "@bitwarden/common/admin-console/abstractions/organization-user/responses";
 import { CryptoService } from "@bitwarden/common/platform/abstractions/crypto.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
@@ -41,7 +41,7 @@ export class DeviceApprovalsComponent implements OnInit, OnDestroy {
     private platformUtilsService: PlatformUtilsService,
     private i18nService: I18nService,
     private logService: LogService,
-    private validationService: ValidationService
+    private validationService: ValidationService,
   ) {}
 
   async ngOnInit() {
@@ -52,11 +52,11 @@ export class DeviceApprovalsComponent implements OnInit, OnDestroy {
           this.refresh$.pipe(
             tap(() => (this.loading = true)),
             switchMap(() =>
-              this.organizationAuthRequestService.listPendingRequests(this.organizationId)
-            )
-          )
+              this.organizationAuthRequestService.listPendingRequests(this.organizationId),
+            ),
+          ),
         ),
-        takeUntil(this.destroy$)
+        takeUntil(this.destroy$),
       )
       .subscribe((r) => {
         this.tableDataSource.data = r;
@@ -65,16 +65,16 @@ export class DeviceApprovalsComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Creates a copy of the user's symmetric key that has been encrypted with the provided device's public key.
+   * Creates a copy of the user key that has been encrypted with the provided device's public key.
    * @param devicePublicKey
    * @param resetPasswordDetails
    * @private
    */
-  private async getEncryptedUserSymKey(
+  private async getEncryptedUserKey(
     devicePublicKey: string,
-    resetPasswordDetails: OrganizationUserResetPasswordDetailsResponse
+    resetPasswordDetails: OrganizationUserResetPasswordDetailsResponse,
   ): Promise<EncString> {
-    const encryptedUserSymKey = resetPasswordDetails.resetPasswordKey;
+    const encryptedUserKey = resetPasswordDetails.resetPasswordKey;
     const encryptedOrgPrivateKey = resetPasswordDetails.encryptedPrivateKey;
     const devicePubKey = Utils.fromB64ToArray(devicePublicKey);
 
@@ -82,22 +82,22 @@ export class DeviceApprovalsComponent implements OnInit, OnDestroy {
     const orgSymKey = await this.cryptoService.getOrgKey(this.organizationId);
     const decOrgPrivateKey = await this.cryptoService.decryptToBytes(
       new EncString(encryptedOrgPrivateKey),
-      orgSymKey
+      orgSymKey,
     );
 
-    // Decrypt User's symmetric key with decrypted org private key
-    const decValue = await this.cryptoService.rsaDecrypt(encryptedUserSymKey, decOrgPrivateKey);
-    const userSymKey = new SymmetricCryptoKey(decValue);
+    // Decrypt user key with decrypted org private key
+    const decValue = await this.cryptoService.rsaDecrypt(encryptedUserKey, decOrgPrivateKey);
+    const userKey = new SymmetricCryptoKey(decValue);
 
-    // Re-encrypt User's Symmetric Key with the Device Public Key
-    return await this.cryptoService.rsaEncrypt(userSymKey.key, devicePubKey.buffer);
+    // Re-encrypt user Key with the Device Public Key
+    return await this.cryptoService.rsaEncrypt(userKey.key, devicePubKey);
   }
 
   async approveRequest(authRequest: PendingAuthRequestView) {
     await this.performAsyncAction(async () => {
       const details = await this.organizationUserService.getOrganizationUserResetPasswordDetails(
         this.organizationId,
-        authRequest.organizationUserId
+        authRequest.organizationUserId,
       );
 
       // The user must be enrolled in account recovery (password reset) in order for the request to be approved.
@@ -105,23 +105,23 @@ export class DeviceApprovalsComponent implements OnInit, OnDestroy {
         this.platformUtilsService.showToast(
           "error",
           null,
-          this.i18nService.t("resetPasswordDetailsError")
+          this.i18nService.t("resetPasswordDetailsError"),
         );
         return;
       }
 
-      const encryptedKey = await this.getEncryptedUserSymKey(authRequest.publicKey, details);
+      const encryptedKey = await this.getEncryptedUserKey(authRequest.publicKey, details);
 
       await this.organizationAuthRequestService.approvePendingRequest(
         this.organizationId,
         authRequest.id,
-        encryptedKey
+        encryptedKey,
       );
 
       this.platformUtilsService.showToast(
         "success",
         null,
-        this.i18nService.t("loginRequestApproved")
+        this.i18nService.t("loginRequestApproved"),
       );
     });
   }
@@ -141,12 +141,12 @@ export class DeviceApprovalsComponent implements OnInit, OnDestroy {
     await this.performAsyncAction(async () => {
       await this.organizationAuthRequestService.denyPendingRequests(
         this.organizationId,
-        ...this.tableDataSource.data.map((r) => r.id)
+        ...this.tableDataSource.data.map((r) => r.id),
       );
       this.platformUtilsService.showToast(
         "error",
         null,
-        this.i18nService.t("allLoginRequestsDenied")
+        this.i18nService.t("allLoginRequestsDenied"),
       );
     });
   }

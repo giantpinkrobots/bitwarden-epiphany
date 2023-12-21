@@ -1,7 +1,11 @@
+import { Subject } from "rxjs";
 import { Jsonify } from "type-fest";
 
 import { EncryptService } from "@bitwarden/common/platform/abstractions/encrypt.service";
-import { AbstractMemoryStorageService } from "@bitwarden/common/platform/abstractions/storage.service";
+import {
+  AbstractMemoryStorageService,
+  StorageUpdate,
+} from "@bitwarden/common/platform/abstractions/storage.service";
 import { EncString } from "@bitwarden/common/platform/models/domain/enc-string";
 import { MemoryStorageOptions } from "@bitwarden/common/platform/models/domain/storage-options";
 import { SymmetricCryptoKey } from "@bitwarden/common/platform/models/domain/symmetric-crypto-key";
@@ -22,12 +26,19 @@ export class LocalBackedSessionStorageService extends AbstractMemoryStorageServi
   private cache = new Map<string, unknown>();
   private localStorage = new BrowserLocalStorageService();
   private sessionStorage = new BrowserMemoryStorageService();
+  private updatesSubject = new Subject<StorageUpdate>();
+  updates$;
 
   constructor(
     private encryptService: EncryptService,
-    private keyGenerationService: AbstractKeyGenerationService
+    private keyGenerationService: AbstractKeyGenerationService,
   ) {
     super();
+    this.updates$ = this.updatesSubject.asObservable();
+  }
+
+  get valuesRequireDeserialization(): boolean {
+    return true;
   }
 
   async get<T>(key: string, options?: MemoryStorageOptions<T>): Promise<T> {

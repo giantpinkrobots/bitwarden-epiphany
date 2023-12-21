@@ -29,14 +29,14 @@ export class CreateCommand {
     private stateService: StateService,
     private cryptoService: CryptoService,
     private apiService: ApiService,
-    private folderApiService: FolderApiServiceAbstraction
+    private folderApiService: FolderApiServiceAbstraction,
   ) {}
 
   async run(
     object: string,
     requestJson: string,
     cmdOptions: Record<string, any>,
-    additionalData: any = null
+    additionalData: any = null,
   ): Promise<Response> {
     let req: any = null;
     if (object !== "attachment") {
@@ -80,7 +80,9 @@ export class CreateCommand {
     try {
       await this.cipherService.createWithServer(cipher);
       const newCipher = await this.cipherService.get(cipher.id);
-      const decCipher = await newCipher.decrypt();
+      const decCipher = await newCipher.decrypt(
+        await this.cipherService.getKeyForCipherKeyDecryption(newCipher),
+      );
       const res = new CipherResponse(decCipher);
       return Response.success(res);
     } catch (e) {
@@ -126,11 +128,11 @@ export class CreateCommand {
       return Response.error("Premium status is required to use this feature.");
     }
 
-    const encKey = await this.cryptoService.getEncKey();
-    if (encKey == null) {
+    const userKey = await this.cryptoService.getUserKey();
+    if (userKey == null) {
       return Response.error(
         "You must update your encryption key before you can use this feature. " +
-          "See https://help.bitwarden.com/article/update-encryption-key/"
+          "See https://help.bitwarden.com/article/update-encryption-key/",
       );
     }
 
@@ -138,10 +140,12 @@ export class CreateCommand {
       await this.cipherService.saveAttachmentRawWithServer(
         cipher,
         fileName,
-        new Uint8Array(fileBuf).buffer
+        new Uint8Array(fileBuf).buffer,
       );
       const updatedCipher = await this.cipherService.get(cipher.id);
-      const decCipher = await updatedCipher.decrypt();
+      const decCipher = await updatedCipher.decrypt(
+        await this.cipherService.getKeyForCipherKeyDecryption(updatedCipher),
+      );
       return Response.success(new CipherResponse(decCipher));
     } catch (e) {
       return Response.error(e);
@@ -180,7 +184,9 @@ export class CreateCommand {
       const groups =
         req.groups == null
           ? null
-          : req.groups.map((g) => new SelectionReadOnlyRequest(g.id, g.readOnly, g.hidePasswords));
+          : req.groups.map(
+              (g) => new SelectionReadOnlyRequest(g.id, g.readOnly, g.hidePasswords, g.manage),
+            );
       const request = new CollectionRequest();
       request.name = (await this.cryptoService.encrypt(req.name, orgKey)).encryptedString;
       request.externalId = req.externalId;

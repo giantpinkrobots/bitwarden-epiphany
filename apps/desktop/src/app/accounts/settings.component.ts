@@ -1,28 +1,28 @@
 import { Component, OnInit } from "@angular/core";
 import { FormBuilder } from "@angular/forms";
-import { Observable, Subject } from "rxjs";
-import { concatMap, debounceTime, filter, map, takeUntil, tap } from "rxjs/operators";
+import { BehaviorSubject, firstValueFrom, Observable, Subject } from "rxjs";
+import { concatMap, debounceTime, filter, map, switchMap, takeUntil, tap } from "rxjs/operators";
 
-import { DialogServiceAbstraction, SimpleDialogType } from "@bitwarden/angular/services/dialog";
+import { AbstractThemingService } from "@bitwarden/angular/platform/services/theming/theming.service.abstraction";
 import { ModalService } from "@bitwarden/angular/services/modal.service";
-import { AbstractThemingService } from "@bitwarden/angular/services/theming/theming.service.abstraction";
 import { SettingsService } from "@bitwarden/common/abstractions/settings.service";
-import { VaultTimeoutSettingsService } from "@bitwarden/common/abstractions/vaultTimeout/vaultTimeoutSettings.service";
+import { VaultTimeoutSettingsService } from "@bitwarden/common/abstractions/vault-timeout/vault-timeout-settings.service";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
-import { DeviceType, ThemeType, KeySuffixOptions } from "@bitwarden/common/enums";
+import { UserVerificationService as UserVerificationServiceAbstraction } from "@bitwarden/common/auth/abstractions/user-verification/user-verification.service.abstraction";
+import { DeviceType } from "@bitwarden/common/enums";
 import { VaultTimeoutAction } from "@bitwarden/common/enums/vault-timeout-action.enum";
 import { CryptoService } from "@bitwarden/common/platform/abstractions/crypto.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { MessagingService } from "@bitwarden/common/platform/abstractions/messaging.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
+import { ThemeType, KeySuffixOptions } from "@bitwarden/common/platform/enums";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
+import { DialogService } from "@bitwarden/components";
 
+import { SetPinComponent } from "../../auth/components/set-pin.component";
 import { flagEnabled } from "../../platform/flags";
 import { ElectronStateService } from "../../platform/services/electron-state.service.abstraction";
-import { isWindowsStore } from "../../utils";
-import { SetPinComponent } from "../components/set-pin.component";
-
 @Component({
   selector: "app-settings",
   templateUrl: "settings.component.html",
@@ -61,11 +61,15 @@ export class SettingsComponent implements OnInit {
 
   currentUserEmail: string;
 
+  availableVaultTimeoutActions$: Observable<VaultTimeoutAction[]>;
   vaultTimeoutPolicyCallout: Observable<{
     timeout: { hours: number; minutes: number };
     action: "lock" | "logOut";
   }>;
   previousVaultTimeout: number = null;
+
+  userHasMasterPassword: boolean;
+  userHasPinSet: boolean;
 
   form = this.formBuilder.group({
     // Security
@@ -97,6 +101,7 @@ export class SettingsComponent implements OnInit {
     locale: [null as string | null],
   });
 
+  private refreshTimeoutSettings$ = new BehaviorSubject<void>(undefined);
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -111,7 +116,8 @@ export class SettingsComponent implements OnInit {
     private modalService: ModalService,
     private themingService: AbstractThemingService,
     private settingsService: SettingsService,
-    private dialogService: DialogServiceAbstraction
+    private dialogService: DialogService,
+    private userVerificationService: UserVerificationServiceAbstraction,
   ) {
     const isMac = this.platformUtilsService.getDevice() === DeviceType.MacOsDesktop;
 
@@ -189,12 +195,18 @@ export class SettingsComponent implements OnInit {
   }
 
   async ngOnInit() {
+    this.userHasMasterPassword = await this.userVerificationService.hasMasterPassword();
+
     this.isWindows = (await this.platformUtilsService.getDevice()) === DeviceType.WindowsDesktop;
 
     if ((await this.stateService.getUserId()) == null) {
       return;
     }
     this.currentUserEmail = await this.stateService.getEmail();
+
+    this.availableVaultTimeoutActions$ = this.refreshTimeoutSettings$.pipe(
+      switchMap(() => this.vaultTimeoutSettingsService.availableVaultTimeoutActions$()),
+    );
 
     // Load timeout policy
     this.vaultTimeoutPolicyCallout = this.policyService.get$(PolicyType.MaximumVaultTimeout).pipe(
@@ -215,15 +227,19 @@ export class SettingsComponent implements OnInit {
         } else {
           this.form.controls.vaultTimeoutAction.enable({ emitEvent: false });
         }
-      })
+      }),
     );
 
     // Load initial values
-    const pinSet = await this.vaultTimeoutSettingsService.isPinLockSet();
+    const pinStatus = await this.vaultTimeoutSettingsService.isPinLockSet();
+    this.userHasPinSet = pinStatus !== "DISABLED";
+
     const initialValues = {
       vaultTimeout: await this.vaultTimeoutSettingsService.getVaultTimeout(),
-      vaultTimeoutAction: await this.vaultTimeoutSettingsService.getVaultTimeoutAction(),
-      pin: pinSet[0] || pinSet[1],
+      vaultTimeoutAction: await firstValueFrom(
+        this.vaultTimeoutSettingsService.vaultTimeoutAction$(),
+      ),
+      pin: this.userHasPinSet,
       biometric: await this.vaultTimeoutSettingsService.isBiometricLockSet(),
       autoPromptBiometrics: !(await this.stateService.getDisableAutoBiometricsPrompt()),
       requirePasswordOnStart:
@@ -264,6 +280,15 @@ export class SettingsComponent implements OnInit {
     this.autoPromptBiometricsText = await this.stateService.getNoAutoPromptBiometricsText();
     this.previousVaultTimeout = this.form.value.vaultTimeout;
 
+    this.refreshTimeoutSettings$
+      .pipe(
+        switchMap(() => this.vaultTimeoutSettingsService.vaultTimeoutAction$()),
+        takeUntil(this.destroy$),
+      )
+      .subscribe((action) => {
+        this.form.controls.vaultTimeoutAction.setValue(action, { emitEvent: false });
+      });
+
     // Form events
     this.form.controls.vaultTimeout.valueChanges
       .pipe(
@@ -271,7 +296,7 @@ export class SettingsComponent implements OnInit {
         concatMap(async (value) => {
           await this.saveVaultTimeout(value);
         }),
-        takeUntil(this.destroy$)
+        takeUntil(this.destroy$),
       )
       .subscribe();
 
@@ -280,7 +305,27 @@ export class SettingsComponent implements OnInit {
         concatMap(async (action) => {
           await this.saveVaultTimeoutAction(action);
         }),
-        takeUntil(this.destroy$)
+        takeUntil(this.destroy$),
+      )
+      .subscribe();
+
+    this.form.controls.pin.valueChanges
+      .pipe(
+        concatMap(async (value) => {
+          await this.updatePin(value);
+          this.refreshTimeoutSettings$.next();
+        }),
+        takeUntil(this.destroy$),
+      )
+      .subscribe();
+
+    this.form.controls.biometric.valueChanges
+      .pipe(
+        concatMap(async (enabled) => {
+          await this.updateBiometric(enabled);
+          this.refreshTimeoutSettings$.next();
+        }),
+        takeUntil(this.destroy$),
       )
       .subscribe();
 
@@ -300,7 +345,7 @@ export class SettingsComponent implements OnInit {
       const confirmed = await this.dialogService.openSimpleDialog({
         title: { key: "warning" },
         content: { key: "neverLockWarning" },
-        type: SimpleDialogType.WARNING,
+        type: "warning",
       });
 
       if (!confirmed) {
@@ -318,7 +363,7 @@ export class SettingsComponent implements OnInit {
       this.platformUtilsService.showToast(
         "error",
         null,
-        this.i18nService.t("vaultTimeoutTooLarge")
+        this.i18nService.t("vaultTimeoutTooLarge"),
       );
       return;
     }
@@ -327,7 +372,7 @@ export class SettingsComponent implements OnInit {
 
     await this.vaultTimeoutSettingsService.setVaultTimeoutOptions(
       newValue,
-      this.form.value.vaultTimeoutAction
+      this.form.value.vaultTimeoutAction,
     );
   }
 
@@ -336,7 +381,7 @@ export class SettingsComponent implements OnInit {
       const confirmed = await this.dialogService.openSimpleDialog({
         title: { key: "vaultTimeoutLogOutConfirmationTitle" },
         content: { key: "vaultTimeoutLogOutConfirmation" },
-        type: SimpleDialogType.WARNING,
+        type: "warning",
       });
 
       if (!confirmed) {
@@ -351,63 +396,75 @@ export class SettingsComponent implements OnInit {
       this.platformUtilsService.showToast(
         "error",
         null,
-        this.i18nService.t("vaultTimeoutTooLarge")
+        this.i18nService.t("vaultTimeoutTooLarge"),
       );
       return;
     }
 
     await this.vaultTimeoutSettingsService.setVaultTimeoutOptions(
       this.form.value.vaultTimeout,
-      newValue
+      newValue,
     );
   }
 
-  async updatePin() {
-    if (this.form.value.pin) {
+  async updatePin(value: boolean) {
+    if (value) {
       const ref = this.modalService.open(SetPinComponent, { allowMultipleModals: true });
 
       if (ref == null) {
-        this.form.controls.pin.setValue(false);
+        this.form.controls.pin.setValue(false, { emitEvent: false });
         return;
       }
 
-      this.form.controls.pin.setValue(await ref.onClosedPromise());
+      this.userHasPinSet = await ref.onClosedPromise();
+      this.form.controls.pin.setValue(this.userHasPinSet, { emitEvent: false });
     }
-    if (!this.form.value.pin) {
-      await this.cryptoService.clearPinProtectedKey();
+    if (!value) {
+      // If user turned off PIN without having a MP and has biometric + require MP/PIN on restart enabled
+      if (this.form.value.requirePasswordOnStart && !this.userHasMasterPassword) {
+        // then must turn that off to prevent user from getting into bad state
+        this.form.controls.requirePasswordOnStart.setValue(false);
+        await this.updateRequirePasswordOnStart();
+      }
+
       await this.vaultTimeoutSettingsService.clear();
     }
+    this.messagingService.send("redrawMenu");
   }
 
-  async updateBiometric() {
+  async updateBiometric(enabled: boolean) {
     // NOTE: A bug in angular causes [ngModel] to not reflect the backing field value
     // causing the checkbox to remain checked even if authentication fails.
     // The bug should resolve itself once the angular issue is resolved.
     // See: https://github.com/angular/angular/issues/13063
 
-    if (!this.form.value.biometric || !this.supportsBiometric) {
-      this.form.controls.biometric.setValue(false);
-      await this.stateService.setBiometricUnlock(null);
-      await this.cryptoService.toggleKey();
-      return;
-    }
+    try {
+      if (!enabled || !this.supportsBiometric) {
+        this.form.controls.biometric.setValue(false, { emitEvent: false });
+        await this.stateService.setBiometricUnlock(null);
+        await this.cryptoService.refreshAdditionalKeys();
+        return;
+      }
 
-    await this.stateService.setBiometricUnlock(true);
-    if (this.isWindows) {
-      // Recommended settings for Windows Hello
-      this.form.controls.requirePasswordOnStart.setValue(true);
-      this.form.controls.autoPromptBiometrics.setValue(false);
-      await this.stateService.setDisableAutoBiometricsPrompt(true);
-      await this.stateService.setBiometricRequirePasswordOnStart(true);
-      await this.stateService.setDismissedBiometricRequirePasswordOnStart();
-    }
-    await this.cryptoService.toggleKey();
+      await this.stateService.setBiometricUnlock(true);
+      if (this.isWindows) {
+        // Recommended settings for Windows Hello
+        this.form.controls.requirePasswordOnStart.setValue(true);
+        this.form.controls.autoPromptBiometrics.setValue(false);
+        await this.stateService.setDisableAutoBiometricsPrompt(true);
+        await this.stateService.setBiometricRequirePasswordOnStart(true);
+        await this.stateService.setDismissedBiometricRequirePasswordOnStart();
+      }
+      await this.cryptoService.refreshAdditionalKeys();
 
-    // Validate the key is stored in case biometrics fail.
-    const biometricSet = await this.cryptoService.hasKeyStored(KeySuffixOptions.Biometric);
-    this.form.controls.biometric.setValue(biometricSet);
-    if (!biometricSet) {
-      await this.stateService.setBiometricUnlock(null);
+      // Validate the key is stored in case biometrics fail.
+      const biometricSet = await this.cryptoService.hasUserKeyStored(KeySuffixOptions.Biometric);
+      this.form.controls.biometric.setValue(biometricSet, { emitEvent: false });
+      if (!biometricSet) {
+        await this.stateService.setBiometricUnlock(null);
+      }
+    } finally {
+      this.messagingService.send("redrawMenu");
     }
   }
 
@@ -435,7 +492,7 @@ export class SettingsComponent implements OnInit {
       await this.stateService.setBiometricEncryptionClientKeyHalf(null);
     }
     await this.stateService.setDismissedBiometricRequirePasswordOnStart();
-    await this.cryptoService.toggleKey();
+    await this.cryptoService.refreshAdditionalKeys();
   }
 
   async saveFavicons() {
@@ -465,7 +522,7 @@ export class SettingsComponent implements OnInit {
       const confirm = await this.dialogService.openSimpleDialog({
         title: { key: "confirmTrayTitle" },
         content: { key: "confirmTrayDesc" },
-        type: SimpleDialogType.WARNING,
+        type: "warning",
       });
 
       if (confirm) {
@@ -516,7 +573,7 @@ export class SettingsComponent implements OnInit {
   async saveOpenAtLogin() {
     this.stateService.setOpenAtLogin(this.form.value.openAtLogin);
     this.messagingService.send(
-      this.form.value.openAtLogin ? "addOpenAtLogin" : "removeOpenAtLogin"
+      this.form.value.openAtLogin ? "addOpenAtLogin" : "removeOpenAtLogin",
     );
   }
 
@@ -527,18 +584,18 @@ export class SettingsComponent implements OnInit {
         content: { key: "browserIntegrationMasOnlyDesc" },
         acceptButtonText: { key: "ok" },
         cancelButtonText: null,
-        type: SimpleDialogType.WARNING,
+        type: "warning",
       });
 
       this.form.controls.enableBrowserIntegration.setValue(false);
       return;
-    } else if (isWindowsStore()) {
+    } else if (ipc.platform.isWindowsStore) {
       await this.dialogService.openSimpleDialog({
         title: { key: "browserIntegrationUnsupportedTitle" },
         content: { key: "browserIntegrationWindowsStoreDesc" },
         acceptButtonText: { key: "ok" },
         cancelButtonText: null,
-        type: SimpleDialogType.WARNING,
+        type: "warning",
       });
 
       this.form.controls.enableBrowserIntegration.setValue(false);
@@ -549,7 +606,7 @@ export class SettingsComponent implements OnInit {
         content: { key: "browserIntegrationLinuxDesc" },
         acceptButtonText: { key: "ok" },
         cancelButtonText: null,
-        type: SimpleDialogType.WARNING,
+        type: "warning",
       });
 
       this.form.controls.enableBrowserIntegration.setValue(false);
@@ -560,7 +617,7 @@ export class SettingsComponent implements OnInit {
     this.messagingService.send(
       this.form.value.enableBrowserIntegration
         ? "enableBrowserIntegration"
-        : "disableBrowserIntegration"
+        : "disableBrowserIntegration",
     );
 
     if (!this.form.value.enableBrowserIntegration) {
@@ -571,7 +628,7 @@ export class SettingsComponent implements OnInit {
 
   async saveDdgBrowserIntegration() {
     await this.stateService.setEnableDuckDuckGoBrowserIntegration(
-      this.form.value.enableDuckDuckGoBrowserIntegration
+      this.form.value.enableDuckDuckGoBrowserIntegration,
     );
 
     if (!this.form.value.enableBrowserIntegration) {
@@ -581,13 +638,13 @@ export class SettingsComponent implements OnInit {
     this.messagingService.send(
       this.form.value.enableDuckDuckGoBrowserIntegration
         ? "enableDuckDuckGoBrowserIntegration"
-        : "disableDuckDuckGoBrowserIntegration"
+        : "disableDuckDuckGoBrowserIntegration",
     );
   }
 
   async saveBrowserIntegrationFingerprint() {
     await this.stateService.setEnableBrowserIntegrationFingerprint(
-      this.form.value.enableBrowserIntegrationFingerprint
+      this.form.value.enableBrowserIntegrationFingerprint,
     );
   }
 

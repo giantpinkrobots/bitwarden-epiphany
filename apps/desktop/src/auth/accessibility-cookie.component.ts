@@ -8,8 +8,6 @@ import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.servic
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 
-import { getCookie } from "../utils";
-
 const BroadcasterSubscriptionId = "AccessibilityCookieComponent";
 
 @Component({
@@ -30,7 +28,7 @@ export class AccessibilityCookieComponent {
     protected environmentService: EnvironmentService,
     protected i18nService: I18nService,
     private broadcasterService: BroadcasterService,
-    protected ngZone: NgZone
+    protected ngZone: NgZone,
   ) {}
 
   async ngOnInit() {
@@ -55,7 +53,7 @@ export class AccessibilityCookieComponent {
 
   async checkForCookie() {
     this.hCaptchaWindow.close();
-    const [cookie] = await getCookie("https://www.hcaptcha.com/", "hc_accessibility");
+    const [cookie] = await ipc.auth.getHcaptchaAccessibilityCookie();
     if (cookie) {
       this.onCookieSavedSuccess();
     } else {
@@ -67,7 +65,7 @@ export class AccessibilityCookieComponent {
     this.platformUtilsService.showToast(
       "success",
       null,
-      this.i18nService.t("accessibilityCookieSaved")
+      this.i18nService.t("accessibilityCookieSaved"),
     );
   }
 
@@ -75,7 +73,7 @@ export class AccessibilityCookieComponent {
     this.platformUtilsService.showToast(
       "error",
       null,
-      this.i18nService.t("noAccessibilityCookieSaved")
+      this.i18nService.t("noAccessibilityCookieSaved"),
     );
   }
 
@@ -84,7 +82,7 @@ export class AccessibilityCookieComponent {
       this.platformUtilsService.showToast(
         "error",
         this.i18nService.t("errorOccurred"),
-        this.i18nService.t("invalidUrl")
+        this.i18nService.t("invalidUrl"),
       );
       return;
     }

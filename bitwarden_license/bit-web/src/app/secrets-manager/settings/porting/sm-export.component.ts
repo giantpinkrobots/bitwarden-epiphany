@@ -3,12 +3,12 @@ import { FormControl, FormGroup, Validators } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
 import { firstValueFrom, Subject, switchMap, takeUntil } from "rxjs";
 
-import { DialogServiceAbstraction } from "@bitwarden/angular/services/dialog";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { FileDownloadService } from "@bitwarden/common/platform/abstractions/file-download/file-download.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
+import { DialogService } from "@bitwarden/components";
 import { openUserVerificationPrompt } from "@bitwarden/web-vault/app/auth/shared/components/user-verification";
 
 import { SecretsManagerPortingApiService } from "../services/sm-porting-api.service";
@@ -42,15 +42,15 @@ export class SecretsManagerExportComponent implements OnInit, OnDestroy {
     private smPortingService: SecretsManagerPortingService,
     private fileDownloadService: FileDownloadService,
     private logService: LogService,
-    private dialogService: DialogServiceAbstraction,
-    private secretsManagerApiService: SecretsManagerPortingApiService
+    private dialogService: DialogService,
+    private secretsManagerApiService: SecretsManagerPortingApiService,
   ) {}
 
   async ngOnInit() {
     this.route.params
       .pipe(
         switchMap(async (params) => await this.organizationService.get(params.organizationId)),
-        takeUntil(this.destroy$)
+        takeUntil(this.destroy$),
       )
       .subscribe((organization) => {
         this.orgName = organization.name;

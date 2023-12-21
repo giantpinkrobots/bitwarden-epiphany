@@ -11,7 +11,13 @@
     <div class="tw-mb-3">
       <bit-form-field>
         <bit-label>{{ "emailAddress" | i18n }}</bit-label>
-        <input id="register-form_input_email" bitInput type="email" formControlName="email" />
+        <input
+          id="register-form_input_email"
+          bitInput
+          type="email"
+          formControlName="email"
+          [attr.readonly]="queryParamFromOrgInvite ? true : null"
+        />
         <bit-hint>{{ "emailAddressDesc" | i18n }}</bit-hint>
       </bit-form-field>
     </div>
@@ -25,12 +31,8 @@
     </div>
 
     <div class="tw-mb-3">
-      <app-callout
-        type="info"
-        [enforcedPolicyOptions]="enforcedPolicyOptions"
-        *ngIf="enforcedPolicyOptions"
-      >
-      </app-callout>
+      <auth-password-callout [policy]="enforcedPolicyOptions" *ngIf="enforcedPolicyOptions">
+      </auth-password-callout>
       <bit-form-field>
         <bit-label>{{ "masterPass" | i18n }}</bit-label>
         <input
@@ -89,7 +91,7 @@
     </div>
 
     <div [hidden]="!showCaptcha()">
-      <iframe id="hcaptcha_iframe" height="80"></iframe>
+      <iframe id="hcaptcha_iframe" height="80" sandbox="allow-scripts allow-same-origin"></iframe>
     </div>
     <div class="tw-mb-4 tw-flex tw-items-start">
       <input
@@ -123,8 +125,7 @@
       </bit-label>
     </div>
 
-    <hr />
-    <div class="tw-flex tw-space-x-2 tw-pt-2">
+    <div class="tw-space-x-2 tw-pt-2">
       <ng-container *ngIf="!accountCreated">
         <button
           [block]="true"
@@ -135,10 +136,6 @@
         >
           {{ "createAccount" | i18n }}
         </button>
-        <a bitButton [block]="true" buttonType="secondary" routerLink="/login">
-          <i class="bwi bwi-sign-in tw-mr-2"></i>
-          {{ "logIn" | i18n }}
-        </a>
       </ng-container>
       <ng-container *ngIf="accountCreated">
         <button
@@ -152,6 +149,10 @@
         </button>
       </ng-container>
     </div>
+    <p class="tw-m-0 tw-mt-5 tw-text-sm">
+      {{ "alreadyHaveAccount" | i18n }}
+      <a routerLink="/login">{{ "logIn" | i18n }}</a>
+    </p>
     <bit-error-summary *ngIf="showErrorSummary" [formGroup]="formGroup"></bit-error-summary>
   </div>
 </form>

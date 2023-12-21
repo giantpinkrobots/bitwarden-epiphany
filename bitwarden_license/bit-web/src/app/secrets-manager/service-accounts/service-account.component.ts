@@ -11,9 +11,9 @@ import {
   takeUntil,
 } from "rxjs";
 
-import { DialogServiceAbstraction } from "@bitwarden/angular/services/dialog";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
+import { DialogService } from "@bitwarden/components";
 
 import { ServiceAccountView } from "../models/view/service-account.view";
 
@@ -31,7 +31,7 @@ export class ServiceAccountComponent implements OnInit, OnDestroy {
 
   private onChange$ = this.serviceAccountService.serviceAccount$.pipe(
     filter((sa) => sa?.id === this.serviceAccountId),
-    startWith(null)
+    startWith(null),
   );
 
   private serviceAccountView: ServiceAccountView;
@@ -39,28 +39,28 @@ export class ServiceAccountComponent implements OnInit, OnDestroy {
     switchMap(([params, _]) =>
       this.serviceAccountService.getByServiceAccountId(
         params.serviceAccountId,
-        params.organizationId
-      )
+        params.organizationId,
+      ),
     ),
     catchError(() => {
       this.router.navigate(["/sm", this.organizationId, "service-accounts"]).then(() => {
         this.platformUtilsService.showToast(
           "error",
           null,
-          this.i18nService.t("notFound", this.i18nService.t("serviceAccount"))
+          this.i18nService.t("notFound", this.i18nService.t("serviceAccount")),
         );
       });
       return EMPTY;
-    })
+    }),
   );
 
   constructor(
     private route: ActivatedRoute,
     private serviceAccountService: ServiceAccountService,
-    private dialogService: DialogServiceAbstraction,
+    private dialogService: DialogService,
     private router: Router,
     private platformUtilsService: PlatformUtilsService,
-    private i18nService: I18nService
+    private i18nService: I18nService,
   ) {}
 
   ngOnInit(): void {
@@ -77,7 +77,7 @@ export class ServiceAccountComponent implements OnInit, OnDestroy {
   protected openNewAccessTokenDialog() {
     AccessTokenCreateDialogComponent.openNewAccessTokenDialog(
       this.dialogService,
-      this.serviceAccountView
+      this.serviceAccountView,
     );
   }
 }

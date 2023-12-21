@@ -1,8 +1,10 @@
 import * as program from "commander";
 import * as inquirer from "inquirer";
 
+import { EventCollectionService } from "@bitwarden/common/abstractions/event/event-collection.service";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
+import { EventType } from "@bitwarden/common/enums";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import {
   ExportFormat,
@@ -16,7 +18,8 @@ import { CliUtils } from "../utils";
 export class ExportCommand {
   constructor(
     private exportService: VaultExportServiceAbstraction,
-    private policyService: PolicyService
+    private policyService: PolicyService,
+    private eventCollectionService: EventCollectionService,
   ) {}
 
   async run(options: program.OptionValues): Promise<Response> {
@@ -25,7 +28,7 @@ export class ExportCommand {
       (await this.policyService.policyAppliesToUser(PolicyType.DisablePersonalVaultExport))
     ) {
       return Response.badRequest(
-        "One or more organization policies prevents you from exporting your personal vault."
+        "One or more organization policies prevents you from exporting your personal vault.",
       );
     }
 
@@ -33,8 +36,8 @@ export class ExportCommand {
     if (!this.isSupportedExportFormat(format)) {
       return Response.badRequest(
         `'${format}' is not a supported export format. Supported formats: ${EXPORT_FORMATS.join(
-          ", "
-        )}.`
+          ", ",
+        )}.`,
       );
     }
 
@@ -48,6 +51,11 @@ export class ExportCommand {
         format === "encrypted_json"
           ? await this.getProtectedExport(options.password, options.organizationid)
           : await this.getUnprotectedExport(format, options.organizationid);
+
+      const eventType = options.organizationid
+        ? EventType.Organization_ClientExportedVault
+        : EventType.User_ClientExportedVault;
+      this.eventCollectionService.collect(eventType, null, true, options.organizationid);
     } catch (e) {
       return Response.error(e);
     }
@@ -68,7 +76,7 @@ export class ExportCommand {
   private async saveFile(
     exportContent: string,
     options: program.OptionValues,
-    format: ExportFormat
+    format: ExportFormat,
   ): Promise<Response> {
     try {
       const fileName = this.getFileName(format, options.organizationid != null ? "org" : null);

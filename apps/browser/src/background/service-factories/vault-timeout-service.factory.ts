@@ -1,13 +1,9 @@
-import { VaultTimeoutService as AbstractVaultTimeoutService } from "@bitwarden/common/abstractions/vaultTimeout/vaultTimeout.service";
+import { VaultTimeoutService as AbstractVaultTimeoutService } from "@bitwarden/common/abstractions/vault-timeout/vault-timeout.service";
 
 import {
   authServiceFactory,
   AuthServiceInitOptions,
 } from "../../auth/background/service-factories/auth-service.factory";
-import {
-  keyConnectorServiceFactory,
-  KeyConnectorServiceInitOptions,
-} from "../../auth/background/service-factories/key-connector-service.factory";
 import {
   CryptoServiceInitOptions,
   cryptoServiceFactory,
@@ -29,7 +25,7 @@ import {
   StateServiceInitOptions,
   stateServiceFactory,
 } from "../../platform/background/service-factories/state-service.factory";
-import VaultTimeoutService from "../../services/vaultTimeout/vaultTimeout.service";
+import VaultTimeoutService from "../../services/vault-timeout/vault-timeout.service";
 import {
   cipherServiceFactory,
   CipherServiceInitOptions,
@@ -64,14 +60,13 @@ export type VaultTimeoutServiceInitOptions = VaultTimeoutServiceFactoryOptions &
   PlatformUtilsServiceInitOptions &
   MessagingServiceInitOptions &
   SearchServiceInitOptions &
-  KeyConnectorServiceInitOptions &
   StateServiceInitOptions &
   AuthServiceInitOptions &
   VaultTimeoutSettingsServiceInitOptions;
 
 export function vaultTimeoutServiceFactory(
   cache: { vaultTimeoutService?: AbstractVaultTimeoutService } & CachedServices,
-  opts: VaultTimeoutServiceInitOptions
+  opts: VaultTimeoutServiceInitOptions,
 ): Promise<AbstractVaultTimeoutService> {
   return factory(
     cache,
@@ -86,12 +81,11 @@ export function vaultTimeoutServiceFactory(
         await platformUtilsServiceFactory(cache, opts),
         await messagingServiceFactory(cache, opts),
         await searchServiceFactory(cache, opts),
-        await keyConnectorServiceFactory(cache, opts),
         await stateServiceFactory(cache, opts),
         await authServiceFactory(cache, opts),
         await vaultTimeoutSettingsServiceFactory(cache, opts),
         opts.vaultTimeoutServiceOptions.lockedCallback,
-        opts.vaultTimeoutServiceOptions.loggedOutCallback
-      )
+        opts.vaultTimeoutServiceOptions.loggedOutCallback,
+      ),
   );
 }

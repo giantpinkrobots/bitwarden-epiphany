@@ -2,9 +2,8 @@ import { Component, Input } from "@angular/core";
 import { UntypedFormBuilder } from "@angular/forms";
 import { Router } from "@angular/router";
 
-import { RegisterComponent as BaseRegisterComponent } from "@bitwarden/angular/components/register.component";
+import { RegisterComponent as BaseRegisterComponent } from "@bitwarden/angular/auth/components/register.component";
 import { FormValidationErrorsService } from "@bitwarden/angular/platform/abstractions/form-validation-errors.service";
-import { DialogServiceAbstraction } from "@bitwarden/angular/services/dialog";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AuditService } from "@bitwarden/common/abstractions/audit.service";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
@@ -18,6 +17,7 @@ import { LogService } from "@bitwarden/common/platform/abstractions/log.service"
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { StateService } from "@bitwarden/common/platform/abstractions/state.service";
 import { PasswordGenerationServiceAbstraction } from "@bitwarden/common/tools/generator/password";
+import { DialogService } from "@bitwarden/components";
 
 @Component({
   selector: "app-register-form",
@@ -25,6 +25,7 @@ import { PasswordGenerationServiceAbstraction } from "@bitwarden/common/tools/ge
 })
 export class RegisterFormComponent extends BaseRegisterComponent {
   @Input() queryParamEmail: string;
+  @Input() queryParamFromOrgInvite: boolean;
   @Input() enforcedPolicyOptions: MasterPasswordPolicyOptions;
   @Input() referenceDataValue: ReferenceEventRequest;
 
@@ -46,7 +47,7 @@ export class RegisterFormComponent extends BaseRegisterComponent {
     environmentService: EnvironmentService,
     logService: LogService,
     auditService: AuditService,
-    dialogService: DialogServiceAbstraction
+    dialogService: DialogService,
   ) {
     super(
       formValidationErrorService,
@@ -62,7 +63,7 @@ export class RegisterFormComponent extends BaseRegisterComponent {
       environmentService,
       logService,
       auditService,
-      dialogService
+      dialogService,
     );
   }
 
@@ -87,13 +88,13 @@ export class RegisterFormComponent extends BaseRegisterComponent {
       !this.policyService.evaluateMasterPassword(
         this.passwordStrengthResult.score,
         this.formGroup.value.masterPassword,
-        this.enforcedPolicyOptions
+        this.enforcedPolicyOptions,
       )
     ) {
       this.platformUtilsService.showToast(
         "error",
         this.i18nService.t("errorOccurred"),
-        this.i18nService.t("masterPasswordPolicyRequirementsNotMet")
+        this.i18nService.t("masterPasswordPolicyRequirementsNotMet"),
       );
       return;
     }

@@ -51,7 +51,7 @@ export class Menubar {
     windowMain: WindowMain,
     webVaultUrl: string,
     appVersion: string,
-    updateRequest?: MenuUpdateRequest
+    updateRequest?: MenuUpdateRequest,
   ) {
     let isLocked = true;
     if (
@@ -62,6 +62,10 @@ export class Menubar {
       isLocked = updateRequest.accounts[updateRequest.activeUserId]?.isLocked ?? true;
     }
 
+    const isLockable = !isLocked && updateRequest?.accounts[updateRequest.activeUserId]?.isLockable;
+    const hasMasterPassword =
+      updateRequest?.accounts[updateRequest.activeUserId]?.hasMasterPassword ?? false;
+
     this.items = [
       new FileMenu(
         i18nService,
@@ -69,16 +73,24 @@ export class Menubar {
         updaterMain,
         windowMain.win,
         updateRequest?.accounts,
-        isLocked
+        isLocked,
+        isLockable,
       ),
       new EditMenu(i18nService, messagingService, isLocked),
       new ViewMenu(i18nService, messagingService, isLocked),
-      new AccountMenu(i18nService, messagingService, webVaultUrl, windowMain.win, isLocked),
+      new AccountMenu(
+        i18nService,
+        messagingService,
+        webVaultUrl,
+        windowMain.win,
+        isLocked,
+        hasMasterPassword,
+      ),
       new WindowMenu(i18nService, messagingService, windowMain),
       new HelpMenu(
         i18nService,
         webVaultUrl,
-        new AboutMenu(i18nService, appVersion, windowMain.win, updaterMain)
+        new AboutMenu(i18nService, appVersion, windowMain.win, updaterMain),
       ),
     ];
 
@@ -91,7 +103,8 @@ export class Menubar {
             updaterMain,
             windowMain.win,
             updateRequest?.accounts,
-            isLocked
+            isLocked,
+            isLockable,
           ),
         ],
         ...this.items,

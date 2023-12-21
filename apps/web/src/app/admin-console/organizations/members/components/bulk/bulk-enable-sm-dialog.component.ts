@@ -1,11 +1,10 @@
 import { DialogRef, DIALOG_DATA } from "@angular/cdk/dialog";
 import { Component, Inject, OnInit } from "@angular/core";
 
-import { DialogServiceAbstraction } from "@bitwarden/angular/services/dialog";
-import { OrganizationUserService } from "@bitwarden/common/abstractions/organization-user/organization-user.service";
+import { OrganizationUserService } from "@bitwarden/common/admin-console/abstractions/organization-user/organization-user.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
-import { TableDataSource } from "@bitwarden/components";
+import { DialogService, TableDataSource } from "@bitwarden/components";
 
 import { OrganizationUserView } from "../../../core";
 
@@ -24,7 +23,7 @@ export class BulkEnableSecretsManagerDialogComponent implements OnInit {
     @Inject(DIALOG_DATA) private data: BulkEnableSecretsManagerDialogData,
     private organizationUserService: OrganizationUserService,
     private platformUtilsService: PlatformUtilsService,
-    private i18nService: I18nService
+    private i18nService: I18nService,
   ) {}
 
   ngOnInit(): void {
@@ -34,20 +33,20 @@ export class BulkEnableSecretsManagerDialogComponent implements OnInit {
   submit = async () => {
     await this.organizationUserService.putOrganizationUserBulkEnableSecretsManager(
       this.data.orgId,
-      this.dataSource.data.map((u) => u.id)
+      this.dataSource.data.map((u) => u.id),
     );
     this.platformUtilsService.showToast(
       "success",
       null,
-      this.i18nService.t("activatedAccessToSecretsManager")
+      this.i18nService.t("activatedAccessToSecretsManager"),
     );
     this.dialogRef.close();
   };
 
-  static open(dialogService: DialogServiceAbstraction, data: BulkEnableSecretsManagerDialogData) {
+  static open(dialogService: DialogService, data: BulkEnableSecretsManagerDialogData) {
     return dialogService.open<unknown, BulkEnableSecretsManagerDialogData>(
       BulkEnableSecretsManagerDialogComponent,
-      { data }
+      { data },
     );
   }
 }

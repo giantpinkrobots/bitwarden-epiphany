@@ -6,7 +6,6 @@ import { OrganizationService } from "@bitwarden/common/admin-console/abstraction
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 
 @Component({
-  selector: "app-org-billing-tab",
   templateUrl: "organization-billing-tab.component.html",
 })
 export class OrganizationBillingTabComponent implements OnInit {
@@ -15,7 +14,7 @@ export class OrganizationBillingTabComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private organizationService: OrganizationService,
-    private platformUtilsService: PlatformUtilsService
+    private platformUtilsService: PlatformUtilsService,
   ) {}
 
   ngOnInit() {
@@ -25,8 +24,8 @@ export class OrganizationBillingTabComponent implements OnInit {
         (org) =>
           !this.platformUtilsService.isSelfHost() &&
           org.canViewBillingHistory &&
-          org.canEditPaymentMethods
-      )
+          org.canEditPaymentMethods,
+      ),
     );
   }
 }

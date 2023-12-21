@@ -18,6 +18,7 @@ export interface ServiceAccountOperation {
   organizationId: string;
   serviceAccountId?: string;
   operation: OperationType;
+  organizationEnabled: boolean;
 }
 
 @Component({
@@ -27,11 +28,11 @@ export class ServiceAccountDialogComponent {
   protected formGroup = new FormGroup(
     {
       name: new FormControl("", {
-        validators: [Validators.required, BitValidators.trimValidator],
+        validators: [Validators.required, Validators.maxLength(500), BitValidators.trimValidator],
         updateOn: "submit",
       }),
     },
-    {}
+    {},
   );
 
   protected loading = false;
@@ -41,7 +42,7 @@ export class ServiceAccountDialogComponent {
     @Inject(DIALOG_DATA) private data: ServiceAccountOperation,
     private serviceAccountService: ServiceAccountService,
     private i18nService: I18nService,
-    private platformUtilsService: PlatformUtilsService
+    private platformUtilsService: PlatformUtilsService,
   ) {}
 
   async ngOnInit() {
@@ -55,13 +56,22 @@ export class ServiceAccountDialogComponent {
     const serviceAccount: ServiceAccountView =
       await this.serviceAccountService.getByServiceAccountId(
         this.data.serviceAccountId,
-        this.data.organizationId
+        this.data.organizationId,
       );
     this.formGroup.patchValue({ name: serviceAccount.name });
     this.loading = false;
   }
 
   submit = async () => {
+    if (!this.data.organizationEnabled) {
+      this.platformUtilsService.showToast(
+        "error",
+        null,
+        this.i18nService.t("serviceAccountsCannotCreate"),
+      );
+      return;
+    }
+
     this.formGroup.markAllAsTouched();
 
     if (this.formGroup.invalid) {
@@ -78,7 +88,7 @@ export class ServiceAccountDialogComponent {
       await this.serviceAccountService.update(
         this.data.serviceAccountId,
         this.data.organizationId,
-        serviceAccountView
+        serviceAccountView,
       );
       serviceAccountMessage = this.i18nService.t("serviceAccountUpdated");
     }

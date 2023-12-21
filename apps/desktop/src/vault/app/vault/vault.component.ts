@@ -11,32 +11,32 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { first } from "rxjs/operators";
 
 import { ModalRef } from "@bitwarden/angular/components/modal/modal.ref";
-import { DialogServiceAbstraction, SimpleDialogType } from "@bitwarden/angular/services/dialog";
 import { ModalService } from "@bitwarden/angular/services/modal.service";
 import { VaultFilter } from "@bitwarden/angular/vault/vault-filter/models/vault-filter.model";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { EventCollectionService } from "@bitwarden/common/abstractions/event/event-collection.service";
-import { TotpService } from "@bitwarden/common/abstractions/totp.service";
 import { EventType } from "@bitwarden/common/enums";
 import { BroadcasterService } from "@bitwarden/common/platform/abstractions/broadcaster.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { MessagingService } from "@bitwarden/common/platform/abstractions/messaging.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { StateService } from "@bitwarden/common/platform/abstractions/state.service";
-import { PasswordRepromptService } from "@bitwarden/common/vault/abstractions/password-reprompt.service";
 import { SyncService } from "@bitwarden/common/vault/abstractions/sync/sync.service.abstraction";
+import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
+import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums/cipher-reprompt-type";
-import { CipherType } from "@bitwarden/common/vault/enums/cipher-type";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FolderView } from "@bitwarden/common/vault/models/view/folder.view";
+import { DialogService } from "@bitwarden/components";
+import { PasswordRepromptService } from "@bitwarden/vault";
 
 import { SearchBarService } from "../../../app/layout/search/search-bar.service";
 import { GeneratorComponent } from "../../../app/tools/generator.component";
 import { invokeMenu, RendererMenuItem } from "../../../utils";
-import { CollectionsComponent } from "../../../vault/app/vault/collections.component";
 
 import { AddEditComponent } from "./add-edit.component";
 import { AttachmentsComponent } from "./attachments.component";
+import { CollectionsComponent } from "./collections.component";
 import { FolderAddEditComponent } from "./folder-add-edit.component";
 import { PasswordHistoryComponent } from "./password-history.component";
 import { ShareComponent } from "./share.component";
@@ -102,7 +102,7 @@ export class VaultComponent implements OnInit, OnDestroy {
     private stateService: StateService,
     private searchBarService: SearchBarService,
     private apiService: ApiService,
-    private dialogService: DialogServiceAbstraction
+    private dialogService: DialogService,
   ) {}
 
   async ngOnInit() {
@@ -207,7 +207,6 @@ export class VaultComponent implements OnInit, OnDestroy {
     if (!this.syncService.syncInProgress) {
       await this.load();
     }
-    document.body.classList.remove("layout_frontend");
 
     this.searchBarService.setEnabled(true);
     this.searchBarService.setPlaceholderText(this.i18nService.t("searchVault"));
@@ -226,7 +225,6 @@ export class VaultComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.searchBarService.setEnabled(false);
     this.broadcasterService.unsubscribe(BroadcasterSubscriptionId);
-    document.body.classList.add("layout_frontend");
   }
 
   async load() {
@@ -470,7 +468,7 @@ export class VaultComponent implements OnInit, OnDestroy {
     const [modal, childComponent] = await this.modalService.openViewRef(
       AttachmentsComponent,
       this.attachmentsModalRef,
-      (comp) => (comp.cipherId = cipher.id)
+      (comp) => (comp.cipherId = cipher.id),
     );
     this.modal = modal;
 
@@ -498,7 +496,7 @@ export class VaultComponent implements OnInit, OnDestroy {
     const [modal, childComponent] = await this.modalService.openViewRef(
       ShareComponent,
       this.shareModalRef,
-      (comp) => (comp.cipherId = cipher.id)
+      (comp) => (comp.cipherId = cipher.id),
     );
     this.modal = modal;
 
@@ -522,7 +520,7 @@ export class VaultComponent implements OnInit, OnDestroy {
     const [modal, childComponent] = await this.modalService.openViewRef(
       CollectionsComponent,
       this.collectionsModalRef,
-      (comp) => (comp.cipherId = cipher.id)
+      (comp) => (comp.cipherId = cipher.id),
     );
     this.modal = modal;
 
@@ -545,7 +543,7 @@ export class VaultComponent implements OnInit, OnDestroy {
     [this.modal] = await this.modalService.openViewRef(
       PasswordHistoryComponent,
       this.passwordHistoryModalRef,
-      (comp) => (comp.cipherId = cipher.id)
+      (comp) => (comp.cipherId = cipher.id),
     );
 
     // eslint-disable-next-line rxjs-angular/prefer-takeuntil, rxjs/no-async-subscribe
@@ -562,12 +560,12 @@ export class VaultComponent implements OnInit, OnDestroy {
 
   async applyVaultFilter(vaultFilter: VaultFilter) {
     this.searchBarService.setPlaceholderText(
-      this.i18nService.t(this.calculateSearchBarLocalizationString(vaultFilter))
+      this.i18nService.t(this.calculateSearchBarLocalizationString(vaultFilter)),
     );
     this.activeFilter = vaultFilter;
     await this.vaultItemsComponent.reload(
       this.activeFilter.buildFilter(),
-      vaultFilter.status === "trash"
+      vaultFilter.status === "trash",
     );
     this.go();
   }
@@ -617,7 +615,7 @@ export class VaultComponent implements OnInit, OnDestroy {
             comp.usernameWebsite = cipher.login.uris[0].hostname;
           }
         }
-      }
+      },
     );
     this.modal = modal;
 
@@ -652,7 +650,7 @@ export class VaultComponent implements OnInit, OnDestroy {
     const [modal, childComponent] = await this.modalService.openViewRef(
       FolderAddEditComponent,
       this.folderAddEditModalRef,
-      (comp) => (comp.folderId = folderId)
+      (comp) => (comp.folderId = folderId),
     );
     this.modal = modal;
 
@@ -684,7 +682,7 @@ export class VaultComponent implements OnInit, OnDestroy {
     const confirmed = await this.dialogService.openSimpleDialog({
       title: { key: "unsavedChangesTitle" },
       content: { key: "unsavedChangesConfirmation" },
-      type: SimpleDialogType.WARNING,
+      type: "warning",
     });
     return !confirmed;
   }
@@ -729,7 +727,7 @@ export class VaultComponent implements OnInit, OnDestroy {
       this.platformUtilsService.showToast(
         "info",
         null,
-        this.i18nService.t("valueCopied", this.i18nService.t(labelI18nKey))
+        this.i18nService.t("valueCopied", this.i18nService.t(labelI18nKey)),
       );
       if (this.action === "view") {
         this.messagingService.send("minimizeOnCopy");
@@ -747,7 +745,7 @@ export class VaultComponent implements OnInit, OnDestroy {
   private prefillNewCipherFromFilter() {
     if (this.activeFilter.selectedCollectionId != null) {
       const collection = this.vaultFilterComponent.collections.fullList.filter(
-        (c) => c.id === this.activeFilter.selectedCollectionId
+        (c) => c.id === this.activeFilter.selectedCollectionId,
       );
       if (collection.length > 0) {
         this.addOrganizationId = collection[0].organizationId;

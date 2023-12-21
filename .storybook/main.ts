@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 
 const config: StorybookConfig = {
   stories: [
+    "../libs/auth/src/**/*.stories.@(js|jsx|ts|tsx)",
     "../libs/components/src/**/*.mdx",
     "../libs/components/src/**/*.stories.@(js|jsx|ts|tsx)",
     "../apps/web/src/**/*.mdx",
@@ -15,6 +16,8 @@ const config: StorybookConfig = {
     "@storybook/addon-links",
     "@storybook/addon-essentials",
     "@storybook/addon-a11y",
+    "@storybook/addon-designs",
+    "@storybook/addon-interactions",
     {
       name: "@storybook/addon-docs",
       options: {

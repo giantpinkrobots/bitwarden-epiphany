@@ -3,9 +3,8 @@ import { Component, Inject, OnInit } from "@angular/core";
 import { FormBuilder } from "@angular/forms";
 
 import { UserNamePipe } from "@bitwarden/angular/pipes/user-name.pipe";
-import { DialogServiceAbstraction } from "@bitwarden/angular/services/dialog";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
-import { OrganizationUserService } from "@bitwarden/common/abstractions/organization-user/organization-user.service";
+import { OrganizationUserService } from "@bitwarden/common/admin-console/abstractions/organization-user/organization-user.service";
 import { EventResponse } from "@bitwarden/common/models/response/event.response";
 import { ListResponse } from "@bitwarden/common/models/response/list.response";
 import { EventView } from "@bitwarden/common/models/view/event.view";
@@ -13,7 +12,7 @@ import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.servic
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { ValidationService } from "@bitwarden/common/platform/abstractions/validation.service";
-import { TableDataSource } from "@bitwarden/components";
+import { DialogService, TableDataSource } from "@bitwarden/components";
 
 import { EventService } from "../../../core";
 import { SharedModule } from "../../../shared";
@@ -63,7 +62,7 @@ export class EntityEventsComponent implements OnInit {
     private logService: LogService,
     private organizationUserService: OrganizationUserService,
     private formBuilder: FormBuilder,
-    private validationService: ValidationService
+    private validationService: ValidationService,
   ) {}
 
   async ngOnInit() {
@@ -107,13 +106,13 @@ export class EntityEventsComponent implements OnInit {
     try {
       dates = this.eventService.formatDateFilters(
         this.filterFormGroup.value.start,
-        this.filterFormGroup.value.end
+        this.filterFormGroup.value.end,
       );
     } catch (e) {
       this.platformUtilsService.showToast(
         "error",
         this.i18nService.t("errorOccurred"),
-        this.i18nService.t("invalidDateRange")
+        this.i18nService.t("invalidDateRange"),
       );
       return;
     }
@@ -125,7 +124,7 @@ export class EntityEventsComponent implements OnInit {
         this.params.entityId,
         dates[0],
         dates[1],
-        clearExisting ? null : this.continuationToken
+        clearExisting ? null : this.continuationToken,
       );
     } else if (this.params.entity === "user") {
       response = await this.apiService.getEventsOrganizationUser(
@@ -133,14 +132,14 @@ export class EntityEventsComponent implements OnInit {
         this.params.entityId,
         dates[0],
         dates[1],
-        clearExisting ? null : this.continuationToken
+        clearExisting ? null : this.continuationToken,
       );
     } else {
       response = await this.apiService.getEventsCipher(
         this.params.entityId,
         dates[0],
         dates[1],
-        clearExisting ? null : this.continuationToken
+        clearExisting ? null : this.continuationToken,
       );
     }
 
@@ -169,7 +168,7 @@ export class EntityEventsComponent implements OnInit {
           systemUser: r.systemUser,
           serviceAccountId: r.serviceAccountId,
         });
-      })
+      }),
     );
 
     if (!clearExisting && this.dataSource.data != null && this.dataSource.data.length > 0) {
@@ -186,8 +185,8 @@ export class EntityEventsComponent implements OnInit {
  * @param config Configuration for the dialog
  */
 export const openEntityEventsDialog = (
-  dialogService: DialogServiceAbstraction,
-  config: DialogConfig<EntityEventsDialogParams>
+  dialogService: DialogService,
+  config: DialogConfig<EntityEventsDialogParams>,
 ) => {
   return dialogService.open<void, EntityEventsDialogParams>(EntityEventsComponent, config);
 };

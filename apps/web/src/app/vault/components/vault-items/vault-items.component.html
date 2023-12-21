@@ -16,10 +16,10 @@
             "all" | i18n
           }}</label>
         </th>
-        <th bitCell [class]="showExtraColumn ? 'tw-w-2/5' : 'tw-w-full'">{{ "name" | i18n }}</th>
-        <th bitCell class="tw-w-3/5" *ngIf="showOwner">{{ "owner" | i18n }}</th>
-        <th bitCell class="tw-w-3/5" *ngIf="showCollections">{{ "collections" | i18n }}</th>
-        <th bitCell class="tw-w-3/5" *ngIf="showGroups">{{ "groups" | i18n }}</th>
+        <th bitCell [class]="showExtraColumn ? 'tw-w-3/5' : 'tw-w-full'">{{ "name" | i18n }}</th>
+        <th bitCell class="tw-w-2/5" *ngIf="showOwner">{{ "owner" | i18n }}</th>
+        <th bitCell class="tw-w-2/5" *ngIf="showCollections">{{ "collections" | i18n }}</th>
+        <th bitCell class="tw-w-2/5" *ngIf="showGroups">{{ "groups" | i18n }}</th>
         <th bitCell class="tw-w-12 tw-text-right">
           <button
             [disabled]="disabled || isEmpty"
@@ -30,12 +30,21 @@
             appA11yTitle="{{ 'options' | i18n }}"
           ></button>
           <bit-menu #headerMenu>
-            <button *ngIf="showBulkMove" type="button" bitMenuItem (click)="bulkMoveToFolder()">
+            <button *ngIf="bulkMoveAllowed" type="button" bitMenuItem (click)="bulkMoveToFolder()">
               <i class="bwi bwi-fw bwi-folder" aria-hidden="true"></i>
               {{ "moveSelected" | i18n }}
             </button>
             <button
-              *ngIf="showBulkMove"
+              *ngIf="showAdminActions && showBulkEditCollectionAccess"
+              type="button"
+              bitMenuItem
+              (click)="bulkEditCollectionAccess()"
+            >
+              <i class="bwi bwi-fw bwi-users" aria-hidden="true"></i>
+              {{ "access" | i18n }}
+            </button>
+            <button
+              *ngIf="bulkMoveAllowed"
               type="button"
               bitMenuItem
               (click)="bulkMoveToOrganization()"
@@ -58,7 +67,7 @@
       </tr>
     </ng-container>
     <ng-template body let-rows$>
-      <ng-container *cdkVirtualFor="let item of rows$">
+      <ng-container *cdkVirtualFor="let item of rows$; templateCacheSize: 0">
         <tr
           *ngIf="item.collection"
           bitRow
@@ -89,10 +98,7 @@
           [showGroups]="showGroups"
           [showPremiumFeatures]="showPremiumFeatures"
           [useEvents]="useEvents"
-          [cloneable]="
-            (item.cipher.organizationId && cloneableOrganizationCiphers) ||
-            item.cipher.organizationId == null
-          "
+          [cloneable]="canClone(item)"
           [organizations]="allOrganizations"
           [collections]="allCollections"
           [checked]="selection.isSelected(item)"

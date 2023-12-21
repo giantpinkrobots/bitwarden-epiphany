@@ -5,7 +5,6 @@ import * as koa from "koa";
 import * as koaBodyParser from "koa-bodyparser";
 import * as koaJson from "koa-json";
 
-import { KeySuffixOptions } from "@bitwarden/common/enums";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 
 import { ConfirmCommand } from "../admin-console/commands/confirm.command";
@@ -67,7 +66,8 @@ export class ServeCommand {
       this.main.stateService,
       this.main.searchService,
       this.main.apiService,
-      this.main.organizationService
+      this.main.organizationService,
+      this.main.eventCollectionService,
     );
     this.listCommand = new ListCommand(
       this.main.cipherService,
@@ -76,7 +76,8 @@ export class ServeCommand {
       this.main.organizationService,
       this.main.searchService,
       this.main.organizationUserService,
-      this.main.apiService
+      this.main.apiService,
+      this.main.eventCollectionService,
     );
     this.createCommand = new CreateCommand(
       this.main.cipherService,
@@ -84,37 +85,37 @@ export class ServeCommand {
       this.main.stateService,
       this.main.cryptoService,
       this.main.apiService,
-      this.main.folderApiService
+      this.main.folderApiService,
     );
     this.editCommand = new EditCommand(
       this.main.cipherService,
       this.main.folderService,
       this.main.cryptoService,
       this.main.apiService,
-      this.main.folderApiService
+      this.main.folderApiService,
     );
     this.generateCommand = new GenerateCommand(
       this.main.passwordGenerationService,
-      this.main.stateService
+      this.main.stateService,
     );
     this.syncCommand = new SyncCommand(this.main.syncService);
     this.statusCommand = new StatusCommand(
       this.main.environmentService,
       this.main.syncService,
       this.main.stateService,
-      this.main.authService
+      this.main.authService,
     );
     this.deleteCommand = new DeleteCommand(
       this.main.cipherService,
       this.main.folderService,
       this.main.stateService,
       this.main.apiService,
-      this.main.folderApiService
+      this.main.folderApiService,
     );
     this.confirmCommand = new ConfirmCommand(
       this.main.apiService,
       this.main.cryptoService,
-      this.main.organizationUserService
+      this.main.organizationUserService,
     );
     this.restoreCommand = new RestoreCommand(this.main.cipherService);
     this.shareCommand = new ShareCommand(this.main.cipherService);
@@ -129,36 +130,36 @@ export class ServeCommand {
       this.main.environmentService,
       this.main.syncService,
       this.main.organizationApiService,
-      async () => await this.main.logout()
+      async () => await this.main.logout(),
     );
 
     this.sendCreateCommand = new SendCreateCommand(
       this.main.sendService,
       this.main.stateService,
       this.main.environmentService,
-      this.main.sendApiService
+      this.main.sendApiService,
     );
     this.sendDeleteCommand = new SendDeleteCommand(this.main.sendService, this.main.sendApiService);
     this.sendGetCommand = new SendGetCommand(
       this.main.sendService,
       this.main.environmentService,
       this.main.searchService,
-      this.main.cryptoService
+      this.main.cryptoService,
     );
     this.sendEditCommand = new SendEditCommand(
       this.main.sendService,
       this.main.stateService,
       this.sendGetCommand,
-      this.main.sendApiService
+      this.main.sendApiService,
     );
     this.sendListCommand = new SendListCommand(
       this.main.sendService,
       this.main.environmentService,
-      this.main.searchService
+      this.main.searchService,
     );
     this.sendRemovePasswordCommand = new SendRemovePasswordCommand(
       this.main.sendService,
-      this.main.sendApiService
+      this.main.sendApiService,
     );
   }
 
@@ -169,7 +170,7 @@ export class ServeCommand {
     this.main.logService.info(
       `Starting server on ${hostname}:${port} with ${
         protectOrigin ? "origin protection" : "no origin protection"
-      }`
+      }`,
     );
 
     const server = new koa();
@@ -186,7 +187,7 @@ export class ServeCommand {
               Utils.isNullOrEmpty(ctx.headers.origin)
                 ? "(Origin header value missing)"
                 : ctx.headers.origin
-            }"`
+            }"`,
           );
           return;
         }
@@ -251,7 +252,7 @@ export class ServeCommand {
 
       const response = await this.unlockCommand.run(
         ctx.request.body.password == null ? null : (ctx.request.body.password as string),
-        ctx.request.query
+        ctx.request.query,
       );
       this.processResponse(ctx.response, response);
       await next();
@@ -265,7 +266,7 @@ export class ServeCommand {
       const response = await this.confirmCommand.run(
         ctx.params.object,
         ctx.params.id,
-        ctx.request.query
+        ctx.request.query,
       );
       this.processResponse(ctx.response, response);
       await next();
@@ -289,7 +290,7 @@ export class ServeCommand {
       const response = await this.shareCommand.run(
         ctx.params.id,
         ctx.params.organizationId,
-        ctx.request.body // TODO: Check the format of this body for an array of collection ids
+        ctx.request.body, // TODO: Check the format of this body for an array of collection ids
       );
       this.processResponse(ctx.response, response);
       await next();
@@ -307,7 +308,7 @@ export class ServeCommand {
         {
           fileBuffer: ctx.request.file.buffer,
           fileName: ctx.request.file.originalname,
-        }
+        },
       );
       this.processResponse(ctx.response, response);
       await next();
@@ -335,7 +336,7 @@ export class ServeCommand {
         response = await this.createCommand.run(
           ctx.params.object,
           ctx.request.body,
-          ctx.request.query
+          ctx.request.query,
         );
       }
       this.processResponse(ctx.response, response);
@@ -356,7 +357,7 @@ export class ServeCommand {
           ctx.params.object,
           ctx.params.id,
           ctx.request.body,
-          ctx.request.query
+          ctx.request.query,
         );
       }
       this.processResponse(ctx.response, response);
@@ -390,7 +391,7 @@ export class ServeCommand {
         response = await this.deleteCommand.run(
           ctx.params.object,
           ctx.params.id,
-          ctx.request.query
+          ctx.request.query,
         );
       }
       this.processResponse(ctx.response, response);
@@ -425,11 +426,7 @@ export class ServeCommand {
       this.processResponse(res, Response.error("You are not logged in."));
       return true;
     }
-    if (await this.main.cryptoService.hasKeyInMemory()) {
-      return false;
-    } else if (await this.main.cryptoService.hasKeyStored(KeySuffixOptions.Auto)) {
-      // load key into memory
-      await this.main.cryptoService.getKey();
+    if (await this.main.cryptoService.hasUserKey()) {
       return false;
     }
     this.processResponse(res, Response.error("Vault is locked."));

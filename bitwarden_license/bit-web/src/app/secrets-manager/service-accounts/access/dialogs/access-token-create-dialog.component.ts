@@ -2,8 +2,7 @@ import { DialogRef, DIALOG_DATA } from "@angular/cdk/dialog";
 import { Component, Inject, OnInit } from "@angular/core";
 import { FormControl, FormGroup, Validators } from "@angular/forms";
 
-import { DialogServiceAbstraction } from "@bitwarden/angular/services/dialog";
-import { BitValidators } from "@bitwarden/components";
+import { DialogService, BitValidators } from "@bitwarden/components";
 
 import { ServiceAccountView } from "../../../models/view/service-account.view";
 import { AccessTokenView } from "../../models/view/access-token.view";
@@ -33,15 +32,15 @@ export class AccessTokenCreateDialogComponent implements OnInit {
   constructor(
     public dialogRef: DialogRef,
     @Inject(DIALOG_DATA) public data: AccessTokenOperation,
-    private dialogService: DialogServiceAbstraction,
-    private accessService: AccessService
+    private dialogService: DialogService,
+    private accessService: AccessService,
   ) {}
 
   async ngOnInit() {
     if (!this.data.serviceAccountView) {
       this.dialogRef.close();
       throw new Error(
-        `The access token create dialog was not called with the appropriate operation values.`
+        `The access token create dialog was not called with the appropriate operation values.`,
       );
     }
   }
@@ -51,18 +50,19 @@ export class AccessTokenCreateDialogComponent implements OnInit {
     if (this.formGroup.invalid) {
       return;
     }
+
     const accessTokenView = new AccessTokenView();
     accessTokenView.name = this.formGroup.value.name;
     accessTokenView.expireAt = this.formGroup.value.expirationDateControl;
     const accessToken = await this.accessService.createAccessToken(
       this.data.serviceAccountView.organizationId,
       this.data.serviceAccountView.id,
-      accessTokenView
+      accessTokenView,
     );
     this.openAccessTokenDialog(
       this.data.serviceAccountView.name,
       accessToken,
-      accessTokenView.expireAt
+      accessTokenView.expireAt,
     );
     this.dialogRef.close();
   };
@@ -70,7 +70,7 @@ export class AccessTokenCreateDialogComponent implements OnInit {
   private openAccessTokenDialog(
     serviceAccountName: string,
     accessToken: string,
-    expirationDate?: Date
+    expirationDate?: Date,
   ) {
     this.dialogService.open<unknown, AccessTokenDetails>(AccessTokenDialogComponent, {
       data: {
@@ -82,8 +82,8 @@ export class AccessTokenCreateDialogComponent implements OnInit {
   }
 
   static openNewAccessTokenDialog(
-    dialogService: DialogServiceAbstraction,
-    serviceAccountView: ServiceAccountView
+    dialogService: DialogService,
+    serviceAccountView: ServiceAccountView,
   ) {
     return dialogService.open<unknown, AccessTokenOperation>(AccessTokenCreateDialogComponent, {
       data: {

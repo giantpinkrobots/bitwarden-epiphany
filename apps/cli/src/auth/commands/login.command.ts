@@ -14,17 +14,16 @@ import { KeyConnectorService } from "@bitwarden/common/auth/abstractions/key-con
 import { TwoFactorService } from "@bitwarden/common/auth/abstractions/two-factor.service";
 import { TwoFactorProviderType } from "@bitwarden/common/auth/enums/two-factor-provider-type";
 import { AuthResult } from "@bitwarden/common/auth/models/domain/auth-result";
-import { ForceResetPasswordReason } from "@bitwarden/common/auth/models/domain/force-reset-password-reason";
+import { ForceSetPasswordReason } from "@bitwarden/common/auth/models/domain/force-set-password-reason";
 import {
-  PasswordLogInCredentials,
-  SsoLogInCredentials,
-  UserApiLogInCredentials,
-} from "@bitwarden/common/auth/models/domain/log-in-credentials";
+  PasswordLoginCredentials,
+  SsoLoginCredentials,
+  UserApiLoginCredentials,
+} from "@bitwarden/common/auth/models/domain/login-credentials";
 import { TokenTwoFactorRequest } from "@bitwarden/common/auth/models/request/identity-token/token-two-factor.request";
 import { PasswordRequest } from "@bitwarden/common/auth/models/request/password.request";
 import { TwoFactorEmailRequest } from "@bitwarden/common/auth/models/request/two-factor-email.request";
 import { UpdateTempPasswordRequest } from "@bitwarden/common/auth/models/request/update-temp-password.request";
-import { NodeUtils } from "@bitwarden/common/misc/nodeUtils";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { CryptoFunctionService } from "@bitwarden/common/platform/abstractions/crypto-function.service";
 import { CryptoService } from "@bitwarden/common/platform/abstractions/crypto.service";
@@ -37,6 +36,7 @@ import { SymmetricCryptoKey } from "@bitwarden/common/platform/models/domain/sym
 import { PasswordGenerationServiceAbstraction } from "@bitwarden/common/tools/generator/password";
 import { PasswordStrengthServiceAbstraction } from "@bitwarden/common/tools/password-strength";
 import { SyncService } from "@bitwarden/common/vault/abstractions/sync/sync.service.abstraction";
+import { NodeUtils } from "@bitwarden/node/node-utils";
 
 import { Response } from "../../models/response";
 import { MessageResponse } from "../../models/response/message.response";
@@ -65,7 +65,7 @@ export class LoginCommand {
     protected keyConnectorService: KeyConnectorService,
     protected policyApiService: PolicyApiServiceAbstraction,
     protected orgService: OrganizationService,
-    protected logoutCallback: () => Promise<void>
+    protected logoutCallback: () => Promise<void>,
   ) {}
 
   async run(email: string, password: string, options: program.OptionValues) {
@@ -179,7 +179,7 @@ export class LoginCommand {
         }
         try {
           response = await this.authService.logIn(
-            new UserApiLogInCredentials(clientId, clientSecret)
+            new UserApiLoginCredentials(clientId, clientSecret),
           );
         } catch (e) {
           // handle API key login failures
@@ -196,21 +196,26 @@ export class LoginCommand {
         }
       } else if (ssoCode != null && ssoCodeVerifier != null) {
         response = await this.authService.logIn(
-          new SsoLogInCredentials(
+          new SsoLoginCredentials(
             ssoCode,
             ssoCodeVerifier,
             this.ssoRedirectUri,
             orgIdentifier,
-            twoFactor
-          )
+            twoFactor,
+          ),
         );
       } else {
         response = await this.authService.logIn(
-          new PasswordLogInCredentials(email, password, null, twoFactor)
+          new PasswordLoginCredentials(email, password, null, twoFactor),
+        );
+      }
+      if (response.requiresEncryptionKeyMigration) {
+        return Response.error(
+          "Encryption key migration required. Please login through the web vault to update your encryption key.",
         );
       }
       if (response.captchaSiteKey) {
-        const credentials = new PasswordLogInCredentials(email, password);
+        const credentials = new PasswordLoginCredentials(email, password);
         const handledResponse = await this.handleCaptchaRequired(twoFactor, credentials);
 
         // Error Response
@@ -289,7 +294,7 @@ export class LoginCommand {
 
         response = await this.authService.logInTwoFactor(
           new TokenTwoFactorRequest(selectedProvider.type, twoFactorToken),
-          null
+          null,
         );
       }
 
@@ -312,7 +317,7 @@ export class LoginCommand {
       if (response.resetMasterPassword) {
         return Response.error(
           "In order to log in with SSO from the CLI, you must first log in" +
-            " through the web vault to set your master password."
+            " through the web vault to set your master password.",
         );
       }
 
@@ -321,13 +326,13 @@ export class LoginCommand {
 
       // Handle updating passwords if NOT using an API Key for authentication
       if (
-        response.forcePasswordReset != ForceResetPasswordReason.None &&
+        response.forcePasswordReset != ForceSetPasswordReason.None &&
         clientId == null &&
         clientSecret == null
       ) {
-        if (response.forcePasswordReset === ForceResetPasswordReason.AdminForcePasswordReset) {
+        if (response.forcePasswordReset === ForceSetPasswordReason.AdminForcePasswordReset) {
           return await this.updateTempPassword();
-        } else if (response.forcePasswordReset === ForceResetPasswordReason.WeakMasterPassword) {
+        } else if (response.forcePasswordReset === ForceSetPasswordReason.WeakMasterPassword) {
           return await this.updateWeakPassword(password);
         }
       }
@@ -353,7 +358,7 @@ export class LoginCommand {
     ) {
       const res = new MessageResponse(
         "You are logged in!",
-        "\n" + "To unlock your vault, use the `unlock` command. ex:\n" + "$ bw unlock"
+        "\n" + "To unlock your vault, use the `unlock` command. ex:\n" + "$ bw unlock",
       );
       return Response.success(res);
     }
@@ -370,7 +375,7 @@ export class LoginCommand {
         '"\n\n' +
         "You can also pass the session key to any command with the `--session` option. ex:\n" +
         "$ bw list items --session " +
-        process.env.BW_SESSION
+        process.env.BW_SESSION,
     );
     res.raw = process.env.BW_SESSION;
     return Response.success(res);
@@ -384,7 +389,7 @@ export class LoginCommand {
 
     const res = new MessageResponse(
       "Your master password has been updated!",
-      "\n" + "You have been logged out and must log in again to access the vault."
+      "\n" + "You have been logged out and must log in again to access the vault.",
     );
 
     return Response.success(res);
@@ -400,21 +405,21 @@ export class LoginCommand {
       return Response.error(
         new MessageResponse(
           "Your master password does not meet one or more of your organization policies. In order to access the vault, you must update your master password now via the web vault. You have been logged out.",
-          null
-        )
+          null,
+        ),
       );
     }
 
     try {
-      const { newPasswordHash, newEncKey, hint } = await this.collectNewMasterPasswordDetails(
-        "Your master password does not meet one or more of your organization policies. In order to access the vault, you must update your master password now."
+      const { newPasswordHash, newUserKey, hint } = await this.collectNewMasterPasswordDetails(
+        "Your master password does not meet one or more of your organization policies. In order to access the vault, you must update your master password now.",
       );
 
       const request = new PasswordRequest();
-      request.masterPasswordHash = await this.cryptoService.hashPassword(currentPassword, null);
+      request.masterPasswordHash = await this.cryptoService.hashMasterKey(currentPassword, null);
       request.masterPasswordHint = hint;
       request.newMasterPasswordHash = newPasswordHash;
-      request.key = newEncKey[1].encryptedString;
+      request.key = newUserKey[1].encryptedString;
 
       await this.apiService.postPassword(request);
 
@@ -438,18 +443,18 @@ export class LoginCommand {
       return Response.error(
         new MessageResponse(
           "An organization administrator recently changed your master password. In order to access the vault, you must update your master password now via the web vault. You have been logged out.",
-          null
-        )
+          null,
+        ),
       );
     }
 
     try {
-      const { newPasswordHash, newEncKey, hint } = await this.collectNewMasterPasswordDetails(
-        "An organization administrator recently changed your master password. In order to access the vault, you must update your master password now."
+      const { newPasswordHash, newUserKey, hint } = await this.collectNewMasterPasswordDetails(
+        "An organization administrator recently changed your master password. In order to access the vault, you must update your master password now.",
       );
 
       const request = new UpdateTempPasswordRequest();
-      request.key = newEncKey[1].encryptedString;
+      request.key = newUserKey[1].encryptedString;
       request.newMasterPasswordHash = newPasswordHash;
       request.masterPasswordHint = hint;
 
@@ -467,17 +472,17 @@ export class LoginCommand {
 
   /**
    * Collect new master password and hint from the CLI. The collected password
-   * is validated against any applicable master password policies and a new encryption
-   * key is generated
+   * is validated against any applicable master password policies, a new master
+   * key is generated, and we use it to re-encrypt the user key
    * @param prompt - Message that is displayed during the initial prompt
    * @param error
    */
   private async collectNewMasterPasswordDetails(
     prompt: string,
-    error?: string
+    error?: string,
   ): Promise<{
     newPasswordHash: string;
-    newEncKey: [SymmetricCryptoKey, EncString];
+    newUserKey: [SymmetricCryptoKey, EncString];
     hint?: string;
   }> {
     if (this.email == null || this.email === "undefined") {
@@ -502,18 +507,18 @@ export class LoginCommand {
     if (masterPassword.length < Utils.minimumPasswordLength) {
       return this.collectNewMasterPasswordDetails(
         prompt,
-        `Master password must be at least ${Utils.minimumPasswordLength} characters long.\n`
+        `Master password must be at least ${Utils.minimumPasswordLength} characters long.\n`,
       );
     }
 
     // Strength & Policy Validation
     const strengthResult = this.passwordStrengthService.getPasswordStrength(
       masterPassword,
-      this.email
+      this.email,
     );
 
     const enforcedPolicyOptions = await firstValueFrom(
-      this.policyService.masterPasswordPolicyOptions$()
+      this.policyService.masterPasswordPolicyOptions$(),
     );
 
     // Verify master password meets policy requirements
@@ -522,12 +527,12 @@ export class LoginCommand {
       !this.policyService.evaluateMasterPassword(
         strengthResult.score,
         masterPassword,
-        enforcedPolicyOptions
+        enforcedPolicyOptions,
       )
     ) {
       return this.collectNewMasterPasswordDetails(
         prompt,
-        "Your new master password does not meet the policy requirements.\n"
+        "Your new master password does not meet the policy requirements.\n",
       );
     }
 
@@ -544,7 +549,7 @@ export class LoginCommand {
     if (masterPassword !== masterPasswordRetype) {
       return this.collectNewMasterPasswordDetails(
         prompt,
-        "Master password confirmation does not match.\n"
+        "Master password confirmation does not match.\n",
       );
     }
 
@@ -559,31 +564,34 @@ export class LoginCommand {
     const kdfConfig = await this.stateService.getKdfConfig();
 
     // Create new key and hash new password
-    const newKey = await this.cryptoService.makeKey(
+    const newMasterKey = await this.cryptoService.makeMasterKey(
       masterPassword,
       this.email.trim().toLowerCase(),
       kdf,
-      kdfConfig
+      kdfConfig,
     );
-    const newPasswordHash = await this.cryptoService.hashPassword(masterPassword, newKey);
+    const newPasswordHash = await this.cryptoService.hashMasterKey(masterPassword, newMasterKey);
 
-    // Grab user's current enc key
-    const userEncKey = await this.cryptoService.getEncKey();
+    // Grab user key
+    const userKey = await this.cryptoService.getUserKey();
+    if (!userKey) {
+      throw new Error("User key not found.");
+    }
 
-    // Create new encKey for the User
-    const newEncKey = await this.cryptoService.remakeEncKey(newKey, userEncKey);
+    // Re-encrypt user key with new master key
+    const newUserKey = await this.cryptoService.encryptUserKeyWithMasterKey(newMasterKey, userKey);
 
-    return { newPasswordHash, newEncKey, hint: masterPasswordHint };
+    return { newPasswordHash, newUserKey: newUserKey, hint: masterPasswordHint };
   }
 
   private async handleCaptchaRequired(
     twoFactorRequest: TokenTwoFactorRequest,
-    credentials: PasswordLogInCredentials = null
+    credentials: PasswordLoginCredentials = null,
   ): Promise<AuthResult | Response> {
     const badCaptcha = Response.badRequest(
       "Your authentication request has been flagged and will require user interaction to proceed.\n" +
         "Please use your API key to validate this request and ensure BW_CLIENTSECRET is correct, if set.\n" +
-        "(https://bitwarden.com/help/cli-auth-challenges)"
+        "(https://bitwarden.com/help/cli-auth-challenges)",
     );
 
     try {
@@ -600,7 +608,7 @@ export class LoginCommand {
       } else {
         authResultResponse = await this.authService.logInTwoFactor(
           twoFactorRequest,
-          captchaClientSecret
+          captchaClientSecret,
         );
       }
 
@@ -677,7 +685,7 @@ export class LoginCommand {
 
   private async openSsoPrompt(
     codeChallenge: string,
-    state: string
+    state: string,
   ): Promise<{ ssoCode: string; orgIdentifier: string }> {
     return new Promise((resolve, reject) => {
       const callbackServer = http.createServer((req, res) => {
@@ -693,13 +701,13 @@ export class LoginCommand {
             "<html><head><title>Success | Bitwarden CLI</title></head><body>" +
               "<h1>Successfully authenticated with the Bitwarden CLI</h1>" +
               "<p>You may now close this tab and return to the terminal.</p>" +
-              "</body></html>"
+              "</body></html>",
           );
           callbackServer.close(() =>
             resolve({
               ssoCode: code,
               orgIdentifier: orgIdentifier,
-            })
+            }),
           );
         } else {
           res.writeHead(400);
@@ -707,7 +715,7 @@ export class LoginCommand {
             "<html><head><title>Failed | Bitwarden CLI</title></head><body>" +
               "<h1>Something went wrong logging into the Bitwarden CLI</h1>" +
               "<p>You may now close this tab and return to the terminal.</p>" +
-              "</body></html>"
+              "</body></html>",
           );
           callbackServer.close(() => reject());
         }
@@ -727,7 +735,7 @@ export class LoginCommand {
                 "&state=" +
                 state +
                 "&codeChallenge=" +
-                codeChallenge
+                codeChallenge,
             );
           });
           foundPort = true;

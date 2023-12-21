@@ -6,8 +6,8 @@ import {
   STATE_FACTORY,
   STATE_SERVICE_USE_CACHE,
 } from "@bitwarden/angular/services/injection-tokens";
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
-import { StateMigrationService } from "@bitwarden/common/platform/abstractions/state-migration.service";
 import {
   AbstractMemoryStorageService,
   AbstractStorageService,
@@ -30,18 +30,18 @@ export class StateService extends BaseStateService<GlobalState, Account> {
     @Inject(SECURE_STORAGE) secureStorageService: AbstractStorageService,
     @Inject(MEMORY_STORAGE) memoryStorageService: AbstractMemoryStorageService,
     logService: LogService,
-    stateMigrationService: StateMigrationService,
     @Inject(STATE_FACTORY) stateFactory: StateFactory<GlobalState, Account>,
-    @Inject(STATE_SERVICE_USE_CACHE) useAccountCache = true
+    accountService: AccountService,
+    @Inject(STATE_SERVICE_USE_CACHE) useAccountCache = true,
   ) {
     super(
       storageService,
       secureStorageService,
       memoryStorageService,
       logService,
-      stateMigrationService,
       stateFactory,
-      useAccountCache
+      accountService,
+      useAccountCache,
     );
   }
 
@@ -58,14 +58,14 @@ export class StateService extends BaseStateService<GlobalState, Account> {
 
   async setEncryptedCiphers(
     value: { [id: string]: CipherData },
-    options?: StorageOptions
+    options?: StorageOptions,
   ): Promise<void> {
     options = this.reconcileOptions(options, await this.defaultInMemoryOptions());
     return await super.setEncryptedCiphers(value, options);
   }
 
   async getEncryptedCollections(
-    options?: StorageOptions
+    options?: StorageOptions,
   ): Promise<{ [id: string]: CollectionData }> {
     options = this.reconcileOptions(options, await this.defaultInMemoryOptions());
     return await super.getEncryptedCollections(options);
@@ -73,7 +73,7 @@ export class StateService extends BaseStateService<GlobalState, Account> {
 
   async setEncryptedCollections(
     value: { [id: string]: CollectionData },
-    options?: StorageOptions
+    options?: StorageOptions,
   ): Promise<void> {
     options = this.reconcileOptions(options, await this.defaultInMemoryOptions());
     return await super.setEncryptedCollections(value, options);
@@ -86,7 +86,7 @@ export class StateService extends BaseStateService<GlobalState, Account> {
 
   async setEncryptedFolders(
     value: { [id: string]: FolderData },
-    options?: StorageOptions
+    options?: StorageOptions,
   ): Promise<void> {
     options = this.reconcileOptions(options, await this.defaultInMemoryOptions());
     return await super.setEncryptedFolders(value, options);
@@ -99,7 +99,7 @@ export class StateService extends BaseStateService<GlobalState, Account> {
 
   async setEncryptedSends(
     value: { [id: string]: SendData },
-    options?: StorageOptions
+    options?: StorageOptions,
   ): Promise<void> {
     options = this.reconcileOptions(options, await this.defaultInMemoryOptions());
     return await super.setEncryptedSends(value, options);

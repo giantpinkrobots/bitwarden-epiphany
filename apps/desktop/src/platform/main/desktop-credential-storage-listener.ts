@@ -4,7 +4,7 @@ import { BiometricKey } from "@bitwarden/common/auth/types/biometric-key";
 import { ConsoleLogService } from "@bitwarden/common/platform/services/console-log.service";
 import { passwords } from "@bitwarden/desktop-native";
 
-import { BiometricMessage, BiometricStorageAction } from "../../types/biometric-message";
+import { BiometricMessage, BiometricAction } from "../../types/biometric-message";
 
 import { BiometricsServiceAbstraction } from "./biometric/index";
 
@@ -14,7 +14,7 @@ export class DesktopCredentialStorageListener {
   constructor(
     private serviceName: string,
     private biometricService: BiometricsServiceAbstraction,
-    private logService: ConsoleLogService
+    private logService: ConsoleLogService,
   ) {}
 
   init() {
@@ -66,7 +66,7 @@ export class DesktopCredentialStorageListener {
         }
 
         switch (message.action) {
-          case BiometricStorageAction.EnabledForUser:
+          case BiometricAction.EnabledForUser:
             if (!message.key || !message.userId) {
               break;
             }
@@ -76,7 +76,7 @@ export class DesktopCredentialStorageListener {
               userId: message.userId,
             });
             break;
-          case BiometricStorageAction.OsSupported:
+          case BiometricAction.OsSupported:
             val = await this.biometricService.osSupportsBiometric();
             break;
           default:

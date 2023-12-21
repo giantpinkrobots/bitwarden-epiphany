@@ -6,21 +6,21 @@ import { first } from "rxjs/operators";
 
 import { VaultFilter } from "@bitwarden/angular/vault/vault-filter/models/vault-filter.model";
 import { SearchService } from "@bitwarden/common/abstractions/search.service";
-import { TreeNode } from "@bitwarden/common/models/domain/tree-node";
 import { BroadcasterService } from "@bitwarden/common/platform/abstractions/broadcaster.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { SyncService } from "@bitwarden/common/vault/abstractions/sync/sync.service.abstraction";
-import { CipherType } from "@bitwarden/common/vault/enums/cipher-type";
+import { CipherType } from "@bitwarden/common/vault/enums";
+import { TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { CollectionView } from "@bitwarden/common/vault/models/view/collection.view";
 import { FolderView } from "@bitwarden/common/vault/models/view/folder.view";
 
 import { BrowserGroupingsComponentState } from "../../../../models/browserGroupingsComponentState";
 import { BrowserApi } from "../../../../platform/browser/browser-api";
+import BrowserPopupUtils from "../../../../platform/popup/browser-popup-utils";
 import { BrowserStateService } from "../../../../platform/services/abstractions/browser-state.service";
-import { PopupUtilsService } from "../../../../popup/services/popup-utils.service";
 import { VaultFilterService } from "../../../services/vault-filter.service";
 
 const ComponentId = "VaultComponent";
@@ -80,13 +80,12 @@ export class VaultFilterComponent implements OnInit, OnDestroy {
     private broadcasterService: BroadcasterService,
     private changeDetectorRef: ChangeDetectorRef,
     private route: ActivatedRoute,
-    private popupUtils: PopupUtilsService,
     private syncService: SyncService,
     private platformUtilsService: PlatformUtilsService,
     private searchService: SearchService,
     private location: Location,
     private browserStateService: BrowserStateService,
-    private vaultFilterService: VaultFilterService
+    private vaultFilterService: VaultFilterService,
   ) {
     this.noFolderListSize = 100;
   }
@@ -94,7 +93,7 @@ export class VaultFilterComponent implements OnInit, OnDestroy {
   async ngOnInit() {
     this.searchTypeSearch = !this.platformUtilsService.isSafari();
     this.showLeftHeader = !(
-      this.popupUtils.inSidebar(window) && this.platformUtilsService.isFirefox()
+      BrowserPopupUtils.inSidebar(window) && this.platformUtilsService.isFirefox()
     );
     await this.browserStateService.setBrowserVaultItemsComponentState(null);
 
@@ -136,7 +135,7 @@ export class VaultFilterComponent implements OnInit, OnDestroy {
       }
 
       if (!this.syncService.syncInProgress || restoredScopeState) {
-        window.setTimeout(() => this.popupUtils.setContentScrollY(window, this.state?.scrollY), 0);
+        BrowserPopupUtils.setContentScrollY(window, this.state?.scrollY);
       }
     });
   }
@@ -178,7 +177,7 @@ export class VaultFilterComponent implements OnInit, OnDestroy {
 
   async loadCollections() {
     const allCollections = await this.vaultFilterService.buildCollections(
-      this.selectedOrganization
+      this.selectedOrganization,
     );
     this.collections = allCollections.fullList;
     this.nestedCollections = allCollections.nestedList;
@@ -186,7 +185,7 @@ export class VaultFilterComponent implements OnInit, OnDestroy {
 
   async loadFolders() {
     const allFolders = await firstValueFrom(
-      this.vaultFilterService.buildNestedFolders(this.selectedOrganization)
+      this.vaultFilterService.buildNestedFolders(this.selectedOrganization),
     );
     this.folders = allFolders.fullList;
     this.nestedFolders = allFolders.nestedList;
@@ -203,10 +202,10 @@ export class VaultFilterComponent implements OnInit, OnDestroy {
       this.ciphers = await this.searchService.searchCiphers(
         this.searchText,
         filterDeleted,
-        this.allCiphers
+        this.allCiphers,
       );
       this.ciphers = this.ciphers.filter(
-        (c) => !this.vaultFilterService.filterCipherForSelectedVault(c)
+        (c) => !this.vaultFilterService.filterCipherForSelectedVault(c),
       );
       return;
     }
@@ -219,11 +218,11 @@ export class VaultFilterComponent implements OnInit, OnDestroy {
         this.ciphers = await this.searchService.searchCiphers(
           this.searchText,
           filterDeleted,
-          this.allCiphers
+          this.allCiphers,
         );
       }
       this.ciphers = this.ciphers.filter(
-        (c) => !this.vaultFilterService.filterCipherForSelectedVault(c)
+        (c) => !this.vaultFilterService.filterCipherForSelectedVault(c),
       );
       this.searchPending = false;
     }, timeout);
@@ -265,7 +264,7 @@ export class VaultFilterComponent implements OnInit, OnDestroy {
     this.preventSelected = true;
     await this.cipherService.updateLastLaunchedDate(cipher.id);
     BrowserApi.createNewTab(cipher.login.launchUri);
-    if (this.popupUtils.inPopup(window)) {
+    if (BrowserPopupUtils.inPopup(window)) {
       BrowserApi.closePopup(window);
     }
   }
@@ -302,7 +301,7 @@ export class VaultFilterComponent implements OnInit, OnDestroy {
     const typeCounts = new Map<CipherType, number>();
 
     this.deletedCount = this.allCiphers.filter(
-      (c) => c.isDeleted && !this.vaultFilterService.filterCipherForSelectedVault(c)
+      (c) => c.isDeleted && !this.vaultFilterService.filterCipherForSelectedVault(c),
     ).length;
 
     this.ciphers?.forEach((c) => {
@@ -376,7 +375,7 @@ export class VaultFilterComponent implements OnInit, OnDestroy {
 
   private async saveState() {
     this.state = Object.assign(new BrowserGroupingsComponentState(), {
-      scrollY: this.popupUtils.getContentScrollY(window),
+      scrollY: BrowserPopupUtils.getContentScrollY(window),
       searchText: this.searchText,
       favoriteCiphers: this.favoriteCiphers,
       noFolderCiphers: this.noFolderCiphers,

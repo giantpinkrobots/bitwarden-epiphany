@@ -32,7 +32,10 @@ export class VaultCollectionRowComponent {
   @Input() checked: boolean;
   @Output() checkedToggled = new EventEmitter<void>();
 
-  constructor(private router: Router, private activatedRoute: ActivatedRoute) {}
+  constructor(
+    private router: Router,
+    private activatedRoute: ActivatedRoute,
+  ) {}
 
   @HostBinding("class")
   get classes() {
@@ -60,11 +63,11 @@ export class VaultCollectionRowComponent {
   }
 
   protected edit() {
-    this.onEvent.next({ type: "edit", item: this.collection });
+    this.onEvent.next({ type: "editCollection", item: this.collection });
   }
 
   protected access() {
-    this.onEvent.next({ type: "viewAccess", item: this.collection });
+    this.onEvent.next({ type: "viewCollectionAccess", item: this.collection });
   }
 
   protected deleteCollection() {

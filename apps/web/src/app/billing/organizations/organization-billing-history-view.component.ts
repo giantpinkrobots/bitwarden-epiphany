@@ -6,7 +6,6 @@ import { OrganizationApiServiceAbstraction } from "@bitwarden/common/admin-conso
 import { BillingHistoryResponse } from "@bitwarden/common/billing/models/response/billing-history.response";
 
 @Component({
-  selector: "app-org-billing-history-view",
   templateUrl: "organization-billing-history-view.component.html",
 })
 export class OrgBillingHistoryViewComponent implements OnInit, OnDestroy {
@@ -19,7 +18,7 @@ export class OrgBillingHistoryViewComponent implements OnInit, OnDestroy {
 
   constructor(
     private organizationApiService: OrganizationApiServiceAbstraction,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
   ) {}
 
   async ngOnInit() {
@@ -30,7 +29,7 @@ export class OrgBillingHistoryViewComponent implements OnInit, OnDestroy {
           await this.load();
           this.firstLoaded = true;
         }),
-        takeUntil(this.destroy$)
+        takeUntil(this.destroy$),
       )
       .subscribe();
   }

@@ -1,9 +1,9 @@
 import { Location } from "@angular/common";
 import { Component } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
+import { firstValueFrom } from "rxjs";
 import { first } from "rxjs/operators";
 
-import { DialogServiceAbstraction } from "@bitwarden/angular/services/dialog";
 import { AddEditComponent as BaseAddEditComponent } from "@bitwarden/angular/vault/components/add-edit.component";
 import { AuditService } from "@bitwarden/common/abstractions/audit.service";
 import { EventCollectionService } from "@bitwarden/common/abstractions/event/event-collection.service";
@@ -18,12 +18,19 @@ import { SendApiService } from "@bitwarden/common/tools/send/services/send-api.s
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CollectionService } from "@bitwarden/common/vault/abstractions/collection.service";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
-import { PasswordRepromptService } from "@bitwarden/common/vault/abstractions/password-reprompt.service";
-import { CipherType } from "@bitwarden/common/vault/enums/cipher-type";
+import { CipherType } from "@bitwarden/common/vault/enums";
 import { LoginUriView } from "@bitwarden/common/vault/models/view/login-uri.view";
+import { DialogService } from "@bitwarden/components";
+import { PasswordRepromptService } from "@bitwarden/vault";
 
 import { BrowserApi } from "../../../../platform/browser/browser-api";
-import { PopupUtilsService } from "../../../../popup/services/popup-utils.service";
+import BrowserPopupUtils from "../../../../platform/popup/browser-popup-utils";
+import { PopupCloseWarningService } from "../../../../popup/services/popup-close-warning.service";
+import {
+  BrowserFido2UserInterfaceSession,
+  fido2PopoutSessionData$,
+} from "../../../fido2/browser-fido2-user-interface.service";
+import { VaultPopoutType, closeAddEditVaultItemPopout } from "../../utils/vault-popout-window";
 
 @Component({
   selector: "app-vault-add-edit",
@@ -35,6 +42,9 @@ export class AddEditComponent extends BaseAddEditComponent {
   showAttachments = true;
   openAttachmentsInPopup: boolean;
   showAutoFillOnPageLoadOptions: boolean;
+  private singleActionKey: string;
+
+  private fido2PopoutSessionData$ = fido2PopoutSessionData$();
 
   constructor(
     cipherService: CipherService,
@@ -50,12 +60,12 @@ export class AddEditComponent extends BaseAddEditComponent {
     private location: Location,
     eventCollectionService: EventCollectionService,
     policyService: PolicyService,
-    private popupUtilsService: PopupUtilsService,
+    private popupCloseWarningService: PopupCloseWarningService,
     organizationService: OrganizationService,
     passwordRepromptService: PasswordRepromptService,
     logService: LogService,
     sendApiService: SendApiService,
-    dialogService: DialogServiceAbstraction
+    dialogService: DialogService,
   ) {
     super(
       cipherService,
@@ -72,7 +82,7 @@ export class AddEditComponent extends BaseAddEditComponent {
       passwordRepromptService,
       organizationService,
       sendApiService,
-      dialogService
+      dialogService,
     );
   }
 
@@ -106,18 +116,16 @@ export class AddEditComponent extends BaseAddEditComponent {
       if (params.selectedVault) {
         this.organizationId = params.selectedVault;
       }
+      if (params.singleActionKey) {
+        this.singleActionKey = params.singleActionKey;
+      }
       await this.load();
 
       if (!this.editMode || this.cloneMode) {
-        if (
-          !this.popupUtilsService.inPopout(window) &&
-          params.name &&
-          (this.cipher.name == null || this.cipher.name === "")
-        ) {
+        if (params.name && (this.cipher.name == null || this.cipher.name === "")) {
           this.cipher.name = params.name;
         }
         if (
-          !this.popupUtilsService.inPopout(window) &&
           params.uri &&
           (this.cipher.login.uris[0].uri == null || this.cipher.login.uris[0].uri === "")
         ) {
@@ -125,7 +133,7 @@ export class AddEditComponent extends BaseAddEditComponent {
         }
       }
 
-      this.openAttachmentsInPopup = this.popupUtilsService.inPopup(window);
+      this.openAttachmentsInPopup = BrowserPopupUtils.inPopup(window);
     });
 
     if (!this.editMode) {
@@ -138,8 +146,8 @@ export class AddEditComponent extends BaseAddEditComponent {
 
     this.setFocus();
 
-    if (this.popupUtilsService.inTab(window)) {
-      this.popupUtilsService.enableCloseTabWarning();
+    if (BrowserPopupUtils.inPopout(window)) {
+      this.popupCloseWarningService.enable();
     }
   }
 
@@ -151,14 +159,37 @@ export class AddEditComponent extends BaseAddEditComponent {
   }
 
   async submit(): Promise<boolean> {
+    const fido2SessionData = await firstValueFrom(this.fido2PopoutSessionData$);
+    const { isFido2Session, sessionId, userVerification } = fido2SessionData;
+    const inFido2PopoutWindow = BrowserPopupUtils.inPopout(window) && isFido2Session;
+    if (
+      inFido2PopoutWindow &&
+      !(await this.handleFido2UserVerification(sessionId, userVerification))
+    ) {
+      return false;
+    }
+
     const success = await super.submit();
     if (!success) {
       return false;
     }
 
-    if (this.popupUtilsService.inTab(window)) {
-      this.popupUtilsService.disableCloseTabWarning();
-      this.messagingService.send("closeTab", { delay: 1000 });
+    if (BrowserPopupUtils.inPopout(window)) {
+      this.popupCloseWarningService.disable();
+    }
+
+    if (inFido2PopoutWindow) {
+      BrowserFido2UserInterfaceSession.confirmNewCredentialResponse(
+        sessionId,
+        this.cipher.id,
+        userVerification,
+      );
+      return true;
+    }
+
+    if (this.inAddEditPopoutWindow()) {
+      this.messagingService.send("addEditCipherSubmitted");
+      await closeAddEditVaultItemPopout(1000);
       return true;
     }
 
@@ -178,7 +209,7 @@ export class AddEditComponent extends BaseAddEditComponent {
         .createUrlTree(["/attachments"], { queryParams: { cipherId: this.cipher.id } })
         .toString();
       const currentBaseUrl = window.location.href.replace(this.router.url, "");
-      this.popupUtilsService.popOut(window, currentBaseUrl + destinationUrl);
+      BrowserPopupUtils.openCurrentPagePopout(window, currentBaseUrl + destinationUrl);
     } else {
       this.router.navigate(["/attachments"], { queryParams: { cipherId: this.cipher.id } });
     }
@@ -191,11 +222,18 @@ export class AddEditComponent extends BaseAddEditComponent {
     }
   }
 
-  cancel() {
+  async cancel() {
     super.cancel();
 
-    if (this.popupUtilsService.inTab(window)) {
-      this.messagingService.send("closeTab");
+    const sessionData = await firstValueFrom(this.fido2PopoutSessionData$);
+    if (BrowserPopupUtils.inPopout(window) && sessionData.isFido2Session) {
+      this.popupCloseWarningService.disable();
+      BrowserFido2UserInterfaceSession.abortPopout(sessionData.sessionId);
+      return;
+    }
+
+    if (this.inAddEditPopoutWindow()) {
+      closeAddEditVaultItemPopout();
       return;
     }
 
@@ -263,5 +301,43 @@ export class AddEditComponent extends BaseAddEditComponent {
         document.getElementById("name").focus();
       }
     }, 200);
+  }
+
+  private async handleFido2UserVerification(
+    sessionId: string,
+    userVerification: boolean,
+  ): Promise<boolean> {
+    // We are bypassing user verification pending implementation of PIN and biometric support.
+    return true;
+  }
+
+  repromptChanged() {
+    super.repromptChanged();
+
+    if (!this.showAutoFillOnPageLoadOptions) {
+      return;
+    }
+
+    if (this.reprompt) {
+      this.platformUtilsService.showToast(
+        "info",
+        null,
+        this.i18nService.t("passwordRepromptDisabledAutofillOnPageLoad"),
+      );
+      return;
+    }
+
+    this.platformUtilsService.showToast(
+      "info",
+      null,
+      this.i18nService.t("autofillOnPageLoadSetToDefault"),
+    );
+  }
+
+  private inAddEditPopoutWindow() {
+    return BrowserPopupUtils.inSingleActionPopout(
+      window,
+      this.singleActionKey || VaultPopoutType.addEditVaultItem,
+    );
   }
 }

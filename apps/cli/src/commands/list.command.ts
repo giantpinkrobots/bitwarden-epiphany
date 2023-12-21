@@ -1,7 +1,9 @@
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
-import { OrganizationUserService } from "@bitwarden/common/abstractions/organization-user/organization-user.service";
+import { EventCollectionService } from "@bitwarden/common/abstractions/event/event-collection.service";
 import { SearchService } from "@bitwarden/common/abstractions/search.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { OrganizationUserService } from "@bitwarden/common/admin-console/abstractions/organization-user/organization-user.service";
+import { EventType } from "@bitwarden/common/enums";
 import { ListResponse as ApiListResponse } from "@bitwarden/common/models/response/list.response";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -32,7 +34,8 @@ export class ListCommand {
     private organizationService: OrganizationService,
     private searchService: SearchService,
     private organizationUserService: OrganizationUserService,
-    private apiService: ApiService
+    private apiService: ApiService,
+    private eventCollectionService: EventCollectionService,
   ) {}
 
   async run(object: string, cmdOptions: Record<string, any>): Promise<Response> {
@@ -121,6 +124,18 @@ export class ListCommand {
 
     if (options.search != null && options.search.trim() !== "") {
       ciphers = this.searchService.searchCiphersBasic(ciphers, options.search, options.trash);
+    }
+
+    for (let i = 0; i < ciphers.length; i++) {
+      const c = ciphers[i];
+      // Set upload immediately on the last item in the ciphers collection to avoid the event collection
+      // service from uploading each time.
+      await this.eventCollectionService.collect(
+        EventType.Cipher_ClientViewed,
+        c.id,
+        i === ciphers.length - 1,
+        c.organizationId,
+      );
     }
 
     const res = new ListResponse(ciphers.map((o) => new CipherResponse(o)));
@@ -215,7 +230,7 @@ export class ListCommand {
           u.type = r.type;
           u.twoFactorEnabled = r.twoFactorEnabled;
           return u;
-        })
+        }),
       );
       return Response.success(res);
     } catch (e) {

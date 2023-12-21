@@ -39,7 +39,7 @@ describe("vault filter service", () => {
     organizations = new ReplaySubject<Organization[]>(1);
     folderViews = new ReplaySubject<FolderView[]>(1);
 
-    organizationService.organizations$ = organizations;
+    organizationService.memberOrganizations$ = organizations;
     folderService.folderViews$ = folderViews;
 
     vaultFilterService = new VaultFilterService(
@@ -48,7 +48,7 @@ describe("vault filter service", () => {
       folderService,
       cipherService,
       policyService,
-      i18nService
+      i18nService,
     );
   });
 
@@ -68,7 +68,7 @@ describe("vault filter service", () => {
       stateService.getCollapsedGroupings.mockResolvedValue(["1", "2"]);
 
       await expect(firstValueFrom(vaultFilterService.collapsedFilterNodes$)).resolves.toEqual(
-        nodes
+        nodes,
       );
     });
   });

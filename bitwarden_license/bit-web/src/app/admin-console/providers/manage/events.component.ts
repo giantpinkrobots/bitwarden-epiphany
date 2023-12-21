@@ -9,7 +9,7 @@ import { FileDownloadService } from "@bitwarden/common/platform/abstractions/fil
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
-import { BaseEventsComponent } from "@bitwarden/web-vault/app/common/base.events.component";
+import { BaseEventsComponent } from "@bitwarden/web-vault/app/admin-console/common/base.events.component";
 import { EventService } from "@bitwarden/web-vault/app/core";
 import { EventExportService } from "@bitwarden/web-vault/app/tools/event-export";
 
@@ -36,7 +36,7 @@ export class EventsComponent extends BaseEventsComponent implements OnInit {
     private router: Router,
     logService: LogService,
     private userNamePipe: UserNamePipe,
-    fileDownloadService: FileDownloadService
+    fileDownloadService: FileDownloadService,
   ) {
     super(
       eventService,
@@ -44,7 +44,7 @@ export class EventsComponent extends BaseEventsComponent implements OnInit {
       exportService,
       platformUtilsService,
       logService,
-      fileDownloadService
+      fileDownloadService,
     );
   }
 
@@ -77,7 +77,7 @@ export class EventsComponent extends BaseEventsComponent implements OnInit {
       this.providerId,
       startDate,
       endDate,
-      continuationToken
+      continuationToken,
     );
   }
 

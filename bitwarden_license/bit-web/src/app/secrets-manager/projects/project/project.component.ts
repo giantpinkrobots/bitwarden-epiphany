@@ -12,9 +12,10 @@ import {
   takeUntil,
 } from "rxjs";
 
-import { DialogServiceAbstraction } from "@bitwarden/angular/services/dialog";
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
+import { DialogService } from "@bitwarden/components";
 
 import { ProjectView } from "../../models/view/project.view";
 import {
@@ -33,23 +34,24 @@ export class ProjectComponent implements OnInit, OnDestroy {
 
   private organizationId: string;
   private projectId: string;
-
+  private organizationEnabled: boolean;
   private destroy$ = new Subject<void>();
 
   constructor(
     private route: ActivatedRoute,
     private projectService: ProjectService,
     private router: Router,
-    private dialogService: DialogServiceAbstraction,
+    private dialogService: DialogService,
     private platformUtilsService: PlatformUtilsService,
-    private i18nService: I18nService
+    private i18nService: I18nService,
+    private organizationService: OrganizationService,
   ) {}
 
   ngOnInit(): void {
     // Update project if it is edited
     const currentProjectEdited = this.projectService.project$.pipe(
       filter((p) => p?.id === this.projectId),
-      startWith(null)
+      startWith(null),
     );
 
     this.project$ = combineLatest([this.route.params, currentProjectEdited]).pipe(
@@ -59,16 +61,17 @@ export class ProjectComponent implements OnInit, OnDestroy {
           this.platformUtilsService.showToast(
             "error",
             null,
-            this.i18nService.t("notFound", this.i18nService.t("project"))
+            this.i18nService.t("notFound", this.i18nService.t("project")),
           );
         });
         return EMPTY;
-      })
+      }),
     );
 
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe((params) => {
       this.organizationId = params.organizationId;
       this.projectId = params.projectId;
+      this.organizationEnabled = this.organizationService.get(params.organizationId)?.enabled;
     });
   }
 
@@ -82,6 +85,7 @@ export class ProjectComponent implements OnInit, OnDestroy {
       data: {
         organizationId: this.organizationId,
         operation: OperationType.Edit,
+        organizationEnabled: this.organizationEnabled,
         projectId: this.projectId,
       },
     });

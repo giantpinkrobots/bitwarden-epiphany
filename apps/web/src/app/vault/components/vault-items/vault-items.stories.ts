@@ -8,10 +8,11 @@ import { SettingsService } from "@bitwarden/common/abstractions/settings.service
 import { OrganizationUserType } from "@bitwarden/common/admin-console/enums";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { TokenService } from "@bitwarden/common/auth/abstractions/token.service";
+import { ConfigServiceAbstraction } from "@bitwarden/common/platform/abstractions/config/config.service.abstraction";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { StateService } from "@bitwarden/common/platform/abstractions/state.service";
 import { SymmetricCryptoKey } from "@bitwarden/common/platform/models/domain/symmetric-crypto-key";
-import { CipherType } from "@bitwarden/common/vault/enums/cipher-type";
+import { CipherType } from "@bitwarden/common/vault/enums";
 import { AttachmentView } from "@bitwarden/common/vault/models/view/attachment.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { LoginUriView } from "@bitwarden/common/vault/models/view/login-uri.view";
@@ -92,6 +93,15 @@ export default {
             },
           } as Partial<TokenService>,
         },
+        {
+          provide: ConfigServiceAbstraction,
+          useValue: {
+            getFeatureFlag() {
+              // does not currently affect any display logic, default all to OFF
+              return false;
+            },
+          },
+        },
       ],
     }),
     applicationConfig({
@@ -125,7 +135,6 @@ Individual.args = {
   showBulkMove: true,
   showBulkTrashOptions: false,
   useEvents: false,
-  editableCollections: false,
   cloneableOrganizationCiphers: false,
 };
 
@@ -141,7 +150,6 @@ IndividualDisabled.args = {
   showBulkMove: true,
   showBulkTrashOptions: false,
   useEvents: false,
-  editableCollections: false,
   cloneableOrganizationCiphers: false,
 };
 
@@ -156,7 +164,6 @@ IndividualTrash.args = {
   showBulkMove: false,
   showBulkTrashOptions: true,
   useEvents: false,
-  editableCollections: false,
   cloneableOrganizationCiphers: false,
 };
 
@@ -171,7 +178,6 @@ IndividualTopLevelCollection.args = {
   showBulkMove: false,
   showBulkTrashOptions: false,
   useEvents: false,
-  editableCollections: false,
   cloneableOrganizationCiphers: false,
 };
 
@@ -186,7 +192,6 @@ IndividualSecondLevelCollection.args = {
   showBulkMove: true,
   showBulkTrashOptions: false,
   useEvents: false,
-  editableCollections: false,
   cloneableOrganizationCiphers: false,
 };
 
@@ -201,7 +206,6 @@ OrganizationVault.args = {
   showBulkMove: false,
   showBulkTrashOptions: false,
   useEvents: true,
-  editableCollections: true,
   cloneableOrganizationCiphers: true,
 };
 
@@ -216,7 +220,6 @@ OrganizationTrash.args = {
   showBulkMove: false,
   showBulkTrashOptions: true,
   useEvents: true,
-  editableCollections: true,
   cloneableOrganizationCiphers: true,
 };
 
@@ -234,7 +237,6 @@ OrganizationTopLevelCollection.args = {
   showBulkMove: false,
   showBulkTrashOptions: false,
   useEvents: true,
-  editableCollections: true,
   cloneableOrganizationCiphers: true,
 };
 
@@ -249,7 +251,6 @@ OrganizationSecondLevelCollection.args = {
   showBulkMove: false,
   showBulkTrashOptions: false,
   useEvents: true,
-  editableCollections: true,
   cloneableOrganizationCiphers: true,
 };
 
@@ -277,7 +278,7 @@ function createCipherView(i: number, deleted = false): CipherView {
     view.attachments = [attachment];
   } else if (i % 5 === 0) {
     const attachment = new AttachmentView();
-    attachment.key = new SymmetricCryptoKey(new ArrayBuffer(32));
+    attachment.key = new SymmetricCryptoKey(new Uint8Array(32));
     view.attachments = [attachment];
   }
 
@@ -298,6 +299,7 @@ function createCollectionView(i: number): CollectionAdminView {
         id: group.id,
         hidePasswords: false,
         readOnly: false,
+        manage: false,
       }),
     ];
   }

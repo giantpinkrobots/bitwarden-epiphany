@@ -3,10 +3,10 @@ import { Component, Inject, OnDestroy, OnInit } from "@angular/core";
 import { FormBuilder, FormControl, FormGroup, ValidatorFn, Validators } from "@angular/forms";
 import { Subject, takeUntil } from "rxjs";
 
-import { DialogServiceAbstraction, SimpleDialogType } from "@bitwarden/angular/services/dialog";
-import { OrgDomainApiServiceAbstraction } from "@bitwarden/common/abstractions/organization-domain/org-domain-api.service.abstraction";
-import { OrgDomainServiceAbstraction } from "@bitwarden/common/abstractions/organization-domain/org-domain.service.abstraction";
-import { OrganizationDomainResponse } from "@bitwarden/common/abstractions/organization-domain/responses/organization-domain.response";
+import { OrgDomainApiServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/organization-domain/org-domain-api.service.abstraction";
+import { OrgDomainServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/organization-domain/org-domain.service.abstraction";
+import { OrganizationDomainResponse } from "@bitwarden/common/admin-console/abstractions/organization-domain/responses/organization-domain.response";
+import { OrganizationDomainRequest } from "@bitwarden/common/admin-console/services/organization-domain/requests/organization-domain.request";
 import { HttpStatusCode } from "@bitwarden/common/enums";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { CryptoFunctionService as CryptoFunctionServiceAbstraction } from "@bitwarden/common/platform/abstractions/crypto-function.service";
@@ -14,7 +14,7 @@ import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.servic
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { ValidationService } from "@bitwarden/common/platform/abstractions/validation.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
-import { OrganizationDomainRequest } from "@bitwarden/common/services/organization-domain/requests/organization-domain.request";
+import { DialogService } from "@bitwarden/components";
 
 import { domainNameValidator } from "./validators/domain-name.validator";
 import { uniqueInArrayValidator } from "./validators/unique-in-array.validator";
@@ -38,7 +38,7 @@ export class DomainAddEditDialogComponent implements OnInit, OnDestroy {
         domainNameValidator(this.i18nService.t("invalidDomainNameMessage")),
         uniqueInArrayValidator(
           this.data.existingDomainNames,
-          this.i18nService.t("duplicateDomainError")
+          this.i18nService.t("duplicateDomainError"),
         ),
       ],
     ],
@@ -66,7 +66,7 @@ export class DomainAddEditDialogComponent implements OnInit, OnDestroy {
     private orgDomainApiService: OrgDomainApiServiceAbstraction,
     private orgDomainService: OrgDomainServiceAbstraction,
     private validationService: ValidationService,
-    private dialogService: DialogServiceAbstraction
+    private dialogService: DialogService,
   ) {}
 
   // Angular Method Implementations
@@ -98,7 +98,7 @@ export class DomainAddEditDialogComponent implements OnInit, OnDestroy {
       // Google uses 43 chars for their TXT record value: https://support.google.com/a/answer/2716802
       // So, chose a magic # of 33 bytes to achieve at least that once converted to base 64 (47 char length).
       const generatedTxt = `bw=${Utils.fromBufferToB64(
-        await this.cryptoFunctionService.randomBytes(33)
+        await this.cryptoFunctionService.randomBytes(33),
       )}`;
       this.txtCtrl.setValue(generatedTxt);
     }
@@ -131,7 +131,7 @@ export class DomainAddEditDialogComponent implements OnInit, OnDestroy {
 
     const request: OrganizationDomainRequest = new OrganizationDomainRequest(
       this.txtCtrl.value,
-      this.domainNameCtrl.value
+      this.domainNameCtrl.value,
     );
 
     try {
@@ -162,7 +162,7 @@ export class DomainAddEditDialogComponent implements OnInit, OnDestroy {
 
             this.rejectedDomainNameValidator = uniqueInArrayValidator(
               this.rejectedDomainNames,
-              this.i18nService.t("domainNotAvailable", this.domainNameCtrl.value)
+              this.i18nService.t("domainNotAvailable", this.domainNameCtrl.value),
             );
 
             this.domainNameCtrl.addValidators(this.rejectedDomainNameValidator);
@@ -195,7 +195,7 @@ export class DomainAddEditDialogComponent implements OnInit, OnDestroy {
     try {
       this.data.orgDomain = await this.orgDomainApiService.verify(
         this.data.organizationId,
-        this.data.orgDomain.id
+        this.data.orgDomain.id,
       );
 
       if (this.data.orgDomain.verifiedDate) {
@@ -245,7 +245,7 @@ export class DomainAddEditDialogComponent implements OnInit, OnDestroy {
     // Update this item so the last checked date gets updated.
     await this.orgDomainApiService.getByOrgIdAndOrgDomainId(
       this.data.organizationId,
-      this.data.orgDomain.id
+      this.data.orgDomain.id,
     );
   }
 
@@ -253,7 +253,7 @@ export class DomainAddEditDialogComponent implements OnInit, OnDestroy {
     const confirmed = await this.dialogService.openSimpleDialog({
       title: { key: "removeDomain" },
       content: { key: "removeDomainWarning" },
-      type: SimpleDialogType.WARNING,
+      type: "warning",
     });
 
     if (!confirmed) {

@@ -3,7 +3,7 @@ import * as inquirer from "inquirer";
 
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { SyncService } from "@bitwarden/common/vault/abstractions/sync/sync.service.abstraction";
-import { ImportServiceAbstraction, ImportType } from "@bitwarden/importer";
+import { ImportServiceAbstraction, ImportType } from "@bitwarden/importer/core";
 
 import { Response } from "../models/response";
 import { MessageResponse } from "../models/response/message.response";
@@ -13,13 +13,13 @@ export class ImportCommand {
   constructor(
     private importService: ImportServiceAbstraction,
     private organizationService: OrganizationService,
-    private syncService: SyncService
+    private syncService: SyncService,
   ) {}
 
   async run(
     format: ImportType,
     filepath: string,
-    options: program.OptionValues
+    options: program.OptionValues,
   ): Promise<Response> {
     const organizationId = options.organizationid;
     if (organizationId != null) {
@@ -27,13 +27,13 @@ export class ImportCommand {
 
       if (organization == null) {
         return Response.badRequest(
-          `You do not belong to an organization with the ID of ${organizationId}. Check the organization ID and sync your vault.`
+          `You do not belong to an organization with the ID of ${organizationId}. Check the organization ID and sync your vault.`,
         );
       }
 
       if (!organization.canAccessImportExport) {
         return Response.badRequest(
-          "You are not authorized to import into the provided organization."
+          "You are not authorized to import into the provided organization.",
         );
       }
     }
@@ -58,7 +58,7 @@ export class ImportCommand {
     const importer = await this.importService.getImporter(
       format,
       promptForPassword_callback,
-      organizationId
+      organizationId,
     );
     if (importer === null) {
       return Response.badRequest("Proper importer type required.");
@@ -66,8 +66,10 @@ export class ImportCommand {
 
     try {
       let contents;
-      if (format === "1password1pux") {
-        contents = await CliUtils.extract1PuxContent(filepath);
+      if (format === "1password1pux" && filepath.endsWith(".1pux")) {
+        contents = await CliUtils.extractZipContent(filepath, "export.data");
+      } else if (format === "protonpass" && filepath.endsWith(".zip")) {
+        contents = await CliUtils.extractZipContent(filepath, "Proton Pass/data.json");
       } else {
         contents = await CliUtils.readFile(filepath);
       }

@@ -5,14 +5,12 @@ import { NavigationEnd, Router } from "@angular/router";
 import * as jq from "jquery";
 import { IndividualConfig, ToastrService } from "ngx-toastr";
 import { Subject, takeUntil } from "rxjs";
-import Swal from "sweetalert2";
 
-import { DialogServiceAbstraction, SimpleDialogType } from "@bitwarden/angular/services/dialog";
 import { EventUploadService } from "@bitwarden/common/abstractions/event/event-upload.service";
 import { NotificationsService } from "@bitwarden/common/abstractions/notifications.service";
 import { SearchService } from "@bitwarden/common/abstractions/search.service";
 import { SettingsService } from "@bitwarden/common/abstractions/settings.service";
-import { VaultTimeoutService } from "@bitwarden/common/abstractions/vaultTimeout/vaultTimeout.service";
+import { VaultTimeoutService } from "@bitwarden/common/abstractions/vault-timeout/vault-timeout.service";
 import { InternalPolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { KeyConnectorService } from "@bitwarden/common/auth/abstractions/key-connector.service";
@@ -27,6 +25,7 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { CollectionService } from "@bitwarden/common/vault/abstractions/collection.service";
 import { InternalFolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
 import { SyncService } from "@bitwarden/common/vault/abstractions/sync/sync.service.abstraction";
+import { DialogService } from "@bitwarden/components";
 
 import { PolicyListService } from "./admin-console/core/policy-list.service";
 import {
@@ -82,7 +81,7 @@ export class AppComponent implements OnDestroy, OnInit {
     protected policyListService: PolicyListService,
     private keyConnectorService: KeyConnectorService,
     private configService: ConfigServiceAbstraction,
-    private dialogService: DialogServiceAbstraction
+    private dialogService: DialogService,
   ) {}
 
   ngOnInit() {
@@ -112,14 +111,12 @@ export class AppComponent implements OnDestroy, OnInit {
             this.notificationsService.updateConnection(false);
             break;
           case "loggedOut":
-            this.routerService.setPreviousUrl(null);
             this.notificationsService.updateConnection(false);
             break;
           case "unlocked":
             this.notificationsService.updateConnection(false);
             break;
           case "authBlocked":
-            this.routerService.setPreviousUrl(message.url);
             this.router.navigate(["/"]);
             break;
           case "logout":
@@ -133,19 +130,20 @@ export class AppComponent implements OnDestroy, OnInit {
             this.router.navigate(["lock"]);
             break;
           case "lockedUrl":
-            this.routerService.setPreviousUrl(message.url);
             break;
           case "syncStarted":
             break;
           case "syncCompleted":
-            await this.configService.fetchServerConfig();
+            if (message.successfully) {
+              this.configService.triggerServerConfigFetch();
+            }
             break;
           case "upgradeOrganization": {
             const upgradeConfirmed = await this.dialogService.openSimpleDialog({
               title: { key: "upgradeOrganization" },
               content: { key: "upgradeOrganizationDesc" },
               acceptButtonText: { key: "upgradeOrganization" },
-              type: SimpleDialogType.INFO,
+              type: "info",
             });
             if (upgradeConfirmed) {
               this.router.navigate([
@@ -162,7 +160,7 @@ export class AppComponent implements OnDestroy, OnInit {
               title: { key: "premiumRequired" },
               content: { key: "premiumRequiredDesc" },
               acceptButtonText: { key: "upgrade" },
-              type: SimpleDialogType.SUCCESS,
+              type: "success",
             });
             if (premiumConfirmed) {
               this.router.navigate(["settings/subscription/premium"]);
@@ -174,11 +172,11 @@ export class AppComponent implements OnDestroy, OnInit {
               title: { key: "emailVerificationRequired" },
               content: { key: "emailVerificationRequiredDesc" },
               acceptButtonText: { key: "learnMore" },
-              type: SimpleDialogType.INFO,
+              type: "info",
             });
             if (emailVerificationConfirmed) {
               this.platformUtilsService.launchUri(
-                "https://bitwarden.com/help/create-bitwarden-account/"
+                "https://bitwarden.com/help/create-bitwarden-account/",
               );
             }
             break;
@@ -203,10 +201,6 @@ export class AppComponent implements OnDestroy, OnInit {
         const modals = Array.from(document.querySelectorAll(".modal"));
         for (const modal of modals) {
           (jq(modal) as any).modal("hide");
-        }
-
-        if (document.querySelector(".swal-modal") != null) {
-          Swal.close(undefined);
         }
       }
     });
@@ -253,12 +247,11 @@ export class AppComponent implements OnDestroy, OnInit {
         this.platformUtilsService.showToast(
           "warning",
           this.i18nService.t("loggedOut"),
-          this.i18nService.t("loginExpired")
+          this.i18nService.t("loginExpired"),
         );
       }
 
       await this.stateService.clean({ userId: userId });
-      Swal.close();
       if (redirect) {
         this.router.navigate(["/"]);
       }
@@ -302,7 +295,7 @@ export class AppComponent implements OnDestroy, OnInit {
     } else {
       msg.text.forEach(
         (t: string) =>
-          (message += "<p>" + this.sanitizer.sanitize(SecurityContext.HTML, t) + "</p>")
+          (message += "<p>" + this.sanitizer.sanitize(SecurityContext.HTML, t) + "</p>"),
       );
       options.enableHtml = true;
     }

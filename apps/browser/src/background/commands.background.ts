@@ -1,13 +1,14 @@
-import { VaultTimeoutService } from "@bitwarden/common/abstractions/vaultTimeout/vaultTimeout.service";
+import { VaultTimeoutService } from "@bitwarden/common/abstractions/vault-timeout/vault-timeout.service";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { PasswordGenerationServiceAbstraction } from "@bitwarden/common/tools/generator/password";
 
+import { openUnlockPopout } from "../auth/popup/utils/auth-popout-window";
+import LockedVaultPendingNotificationsItem from "../autofill/notification/models/locked-vault-pending-notifications-item";
 import { BrowserApi } from "../platform/browser/browser-api";
 
 import MainBackground from "./main.background";
-import LockedVaultPendingNotificationsItem from "./models/lockedVaultPendingNotificationsItem";
 
 export default class CommandsBackground {
   private isSafari: boolean;
@@ -18,24 +19,18 @@ export default class CommandsBackground {
     private passwordGenerationService: PasswordGenerationServiceAbstraction,
     private platformUtilsService: PlatformUtilsService,
     private vaultTimeoutService: VaultTimeoutService,
-    private authService: AuthService
+    private authService: AuthService,
   ) {
     this.isSafari = this.platformUtilsService.isSafari();
     this.isVivaldi = this.platformUtilsService.isVivaldi();
   }
 
   async init() {
-    BrowserApi.messageListener(
-      "commands.background",
-      async (msg: any, sender: chrome.runtime.MessageSender, sendResponse: any) => {
-        if (msg.command === "unlockCompleted" && msg.data.target === "commands.background") {
-          await this.processCommand(
-            msg.data.commandToRetry.msg.command,
-            msg.data.commandToRetry.sender
-          );
-        }
+    BrowserApi.messageListener("commands.background", (msg: any) => {
+      if (msg.command === "unlockCompleted" && msg.data.target === "commands.background") {
+        this.processCommand(msg.data.commandToRetry.msg.command, msg.data.commandToRetry.sender);
       }
-    );
+    });
 
     if (chrome && chrome.commands) {
       chrome.commands.onCommand.addListener(async (command: string) => {
@@ -90,10 +85,10 @@ export default class CommandsBackground {
       await BrowserApi.tabSendMessageData(
         tab,
         "addToLockedVaultPendingNotifications",
-        retryMessage
+        retryMessage,
       );
 
-      BrowserApi.tabSendMessageData(tab, "promptForLogin");
+      await openUnlockPopout(tab);
       return;
     }
 

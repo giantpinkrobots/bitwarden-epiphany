@@ -7,8 +7,7 @@ import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/pl
 import { FolderApiServiceAbstraction } from "@bitwarden/common/vault/abstractions/folder/folder-api.service.abstraction";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
 import { FolderView } from "@bitwarden/common/vault/models/view/folder.view";
-
-import { DialogServiceAbstraction, SimpleDialogType } from "../../services/dialog";
+import { DialogService } from "@bitwarden/components";
 
 @Directive()
 export class FolderAddEditComponent implements OnInit {
@@ -33,8 +32,8 @@ export class FolderAddEditComponent implements OnInit {
     protected i18nService: I18nService,
     protected platformUtilsService: PlatformUtilsService,
     protected logService: LogService,
-    protected dialogService: DialogServiceAbstraction,
-    protected formBuilder: FormBuilder
+    protected dialogService: DialogService,
+    protected formBuilder: FormBuilder,
   ) {}
 
   async ngOnInit() {
@@ -47,7 +46,7 @@ export class FolderAddEditComponent implements OnInit {
       this.platformUtilsService.showToast(
         "error",
         this.i18nService.t("errorOccurred"),
-        this.i18nService.t("nameRequired")
+        this.i18nService.t("nameRequired"),
       );
       return false;
     }
@@ -59,7 +58,7 @@ export class FolderAddEditComponent implements OnInit {
       this.platformUtilsService.showToast(
         "success",
         null,
-        this.i18nService.t(this.editMode ? "editedFolder" : "addedFolder")
+        this.i18nService.t(this.editMode ? "editedFolder" : "addedFolder"),
       );
       this.onSavedFolder.emit(this.folder);
       return true;
@@ -74,7 +73,7 @@ export class FolderAddEditComponent implements OnInit {
     const confirmed = await this.dialogService.openSimpleDialog({
       title: { key: "deleteFolder" },
       content: { key: "deleteFolderConfirmation" },
-      type: SimpleDialogType.WARNING,
+      type: "warning",
     });
 
     if (!confirmed) {

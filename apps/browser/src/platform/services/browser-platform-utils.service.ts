@@ -12,7 +12,7 @@ export default class BrowserPlatformUtilsService implements PlatformUtilsService
     private messagingService: MessagingService,
     private clipboardWriteCallback: (clipboardValue: string, clearMs: number) => void,
     private biometricCallback: () => Promise<boolean>,
-    private win: Window & typeof globalThis
+    private win: Window & typeof globalThis,
   ) {}
 
   static getDevice(win: Window & typeof globalThis): DeviceType {
@@ -197,7 +197,7 @@ export default class BrowserPlatformUtilsService implements PlatformUtilsService
     type: "error" | "success" | "warning" | "info",
     title: string,
     text: string | string[],
-    options?: any
+    options?: any,
   ): void {
     this.messagingService.send("showToast", {
       text: text,
@@ -314,10 +314,6 @@ export default class BrowserPlatformUtilsService implements PlatformUtilsService
       return false;
     }
 
-    if (this.isFirefox()) {
-      return parseInt((await browser.runtime.getBrowserInfo()).version.split(".")[0], 10) >= 87;
-    }
-
     return true;
   }
 
@@ -336,7 +332,7 @@ export default class BrowserPlatformUtilsService implements PlatformUtilsService
       autofillCommand = "Cmd+Shift+L";
     } else if (this.isFirefox()) {
       autofillCommand = (await browser.commands.getAll()).find(
-        (c) => c.name === "autofill_login"
+        (c) => c.name === "autofill_login",
       ).shortcut;
       // Firefox is returning Ctrl instead of Cmd for the modifier key on macOS if
       // the command is the default one set on installation.
@@ -349,8 +345,8 @@ export default class BrowserPlatformUtilsService implements PlatformUtilsService
     } else {
       await new Promise((resolve) =>
         chrome.commands.getAll((c) =>
-          resolve((autofillCommand = c.find((c) => c.name === "autofill_login").shortcut))
-        )
+          resolve((autofillCommand = c.find((c) => c.name === "autofill_login").shortcut)),
+        ),
       );
     }
     return autofillCommand;

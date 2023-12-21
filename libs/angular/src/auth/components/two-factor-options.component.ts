@@ -18,7 +18,7 @@ export class TwoFactorOptionsComponent implements OnInit {
     protected router: Router,
     protected i18nService: I18nService,
     protected platformUtilsService: PlatformUtilsService,
-    protected win: Window
+    protected win: Window,
   ) {}
 
   ngOnInit() {
@@ -30,7 +30,7 @@ export class TwoFactorOptionsComponent implements OnInit {
   }
 
   recover() {
-    this.platformUtilsService.launchUri("https://bitwarden.com/help/lost-two-step-device/");
+    this.platformUtilsService.launchUri("https://vault.bitwarden.com/#/recover-2fa");
     this.onRecoverSelected.emit();
   }
 }

@@ -9,11 +9,13 @@ export abstract class ImportServiceAbstraction {
   import: (
     importer: Importer,
     fileContents: string,
-    organizationId?: string
+    organizationId?: string,
+    selectedImportTarget?: string,
+    canAccessImportExport?: boolean,
   ) => Promise<ImportResult>;
   getImporter: (
     format: ImportType | "bitwardenpasswordprotected",
     promptForPassword_callback: () => Promise<string>,
-    organizationId: string
+    organizationId: string,
   ) => Importer;
 }

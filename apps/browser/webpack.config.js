@@ -14,10 +14,9 @@ if (process.env.NODE_ENV == null) {
 }
 const ENV = (process.env.ENV = process.env.NODE_ENV);
 const manifestVersion = process.env.MANIFEST_VERSION == 3 ? 3 : 2;
-const autofillVersion = process.env.AUTOFILL_VERSION == 2 ? 2 : 1;
 
 console.log(`Building Manifest Version ${manifestVersion} app`);
-console.log(`Using Autofill v${autofillVersion}`);
+
 const envConfig = configurator.load(ENV);
 configurator.log(envConfig);
 
@@ -108,6 +107,16 @@ const plugins = [
     filename: "notification/bar.html",
     chunks: ["notification/bar"],
   }),
+  new HtmlWebpackPlugin({
+    template: "./src/autofill/overlay/pages/button/button.html",
+    filename: "overlay/button.html",
+    chunks: ["overlay/button"],
+  }),
+  new HtmlWebpackPlugin({
+    template: "./src/autofill/overlay/pages/list/list.html",
+    filename: "overlay/list.html",
+    chunks: ["overlay/list"],
+  }),
   new CopyWebpackPlugin({
     patterns: [
       manifestVersion == 3
@@ -136,7 +145,7 @@ const plugins = [
     process: "process/browser.js",
   }),
   new webpack.SourceMapDevToolPlugin({
-    exclude: [/content\/.*/, /notification\/.*/],
+    exclude: [/content\/.*/, /notification\/.*/, /overlay\/.*/],
     filename: "[file].map",
   }),
   ...requiredPlugins,
@@ -153,18 +162,29 @@ const mainConfig = {
   entry: {
     "popup/polyfills": "./src/popup/polyfills.ts",
     "popup/main": "./src/popup/main.ts",
+    "content/trigger-autofill-script-injection":
+      "./src/autofill/content/trigger-autofill-script-injection.ts",
+    "content/autofill": "./src/autofill/content/autofill.js",
+    "content/bootstrap-autofill": "./src/autofill/content/bootstrap-autofill.ts",
+    "content/bootstrap-autofill-overlay": "./src/autofill/content/bootstrap-autofill-overlay.ts",
     "content/autofiller": "./src/autofill/content/autofiller.ts",
     "content/notificationBar": "./src/autofill/content/notification-bar.ts",
     "content/contextMenuHandler": "./src/autofill/content/context-menu-handler.ts",
     "content/message_handler": "./src/autofill/content/message_handler.ts",
+    "content/fido2/trigger-fido2-content-script-injection":
+      "./src/vault/fido2/content/trigger-fido2-content-script-injection.ts",
+    "content/fido2/content-script": "./src/vault/fido2/content/content-script.ts",
+    "content/fido2/page-script": "./src/vault/fido2/content/page-script.ts",
     "notification/bar": "./src/autofill/notification/bar.ts",
+    "overlay/button": "./src/autofill/overlay/pages/button/bootstrap-autofill-overlay-button.ts",
+    "overlay/list": "./src/autofill/overlay/pages/list/bootstrap-autofill-overlay-list.ts",
     "encrypt-worker": "../../libs/common/src/platform/services/cryptography/encrypt.worker.ts",
   },
   optimization: {
     minimize: ENV !== "development",
     minimizer: [
       new TerserPlugin({
-        exclude: [/content\/.*/, /notification\/.*/],
+        exclude: [/content\/.*/, /notification\/.*/, /overlay\/.*/],
         terserOptions: {
           // Replicate Angular CLI behaviour
           compress: {
@@ -210,10 +230,6 @@ const mainConfig = {
     extensions: [".ts", ".js"],
     symlinks: false,
     modules: [path.resolve("../../node_modules")],
-    alias: {
-      sweetalert2: require.resolve("sweetalert2/dist/sweetalert2.js"),
-      "#sweetalert2": require.resolve("sweetalert2/src/sweetalert2.scss"),
-    },
     fallback: {
       assert: false,
       buffer: require.resolve("buffer/"),
@@ -254,7 +270,7 @@ if (manifestVersion == 2) {
       template: "./src/platform/background.html",
       filename: "background.html",
       chunks: ["vendor", "background"],
-    })
+    }),
   );
 
   // Manifest V2 background pages can be run through the regular build pipeline.
@@ -310,14 +326,6 @@ if (manifestVersion == 2) {
 
   configs.push(mainConfig);
   configs.push(backgroundConfig);
-}
-
-if (autofillVersion == 2) {
-  // Typescript refactors (WIP)
-  mainConfig.entry["content/autofill"] = "./src/autofill/content/autofillv2.ts";
-} else {
-  // Javascript (used in production)
-  mainConfig.entry["content/autofill"] = "./src/autofill/content/autofill.js";
 }
 
 module.exports = configs;

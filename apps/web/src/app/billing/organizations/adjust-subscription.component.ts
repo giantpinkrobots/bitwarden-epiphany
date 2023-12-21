@@ -27,7 +27,7 @@ export class AdjustSubscription {
     private i18nService: I18nService,
     private platformUtilsService: PlatformUtilsService,
     private logService: LogService,
-    private organizationApiService: OrganizationApiServiceAbstraction
+    private organizationApiService: OrganizationApiServiceAbstraction,
   ) {}
 
   ngOnInit() {
@@ -38,11 +38,13 @@ export class AdjustSubscription {
 
   async submit() {
     try {
-      const seatAdjustment = this.newSeatCount - this.currentSeatCount;
-      const request = new OrganizationSubscriptionUpdateRequest(seatAdjustment, this.newMaxSeats);
+      const request = new OrganizationSubscriptionUpdateRequest(
+        this.additionalSeatCount,
+        this.newMaxSeats,
+      );
       this.formPromise = this.organizationApiService.updatePasswordManagerSeats(
         this.organizationId,
-        request
+        request,
       );
 
       await this.formPromise;
@@ -50,7 +52,7 @@ export class AdjustSubscription {
       this.platformUtilsService.showToast(
         "success",
         null,
-        this.i18nService.t("subscriptionUpdated")
+        this.i18nService.t("subscriptionUpdated"),
       );
     } catch (e) {
       this.logService.error(e);
@@ -64,11 +66,19 @@ export class AdjustSubscription {
     }
   }
 
+  get additionalSeatCount(): number {
+    return this.newSeatCount ? this.newSeatCount - this.currentSeatCount : 0;
+  }
+
+  get additionalMaxSeatCount(): number {
+    return this.newMaxSeats ? this.newMaxSeats - this.currentSeatCount : 0;
+  }
+
   get adjustedSeatTotal(): number {
-    return this.newSeatCount * this.seatPrice;
+    return this.additionalSeatCount * this.seatPrice;
   }
 
   get maxSeatTotal(): number {
-    return this.newMaxSeats * this.seatPrice;
+    return this.additionalMaxSeatCount * this.seatPrice;
   }
 }

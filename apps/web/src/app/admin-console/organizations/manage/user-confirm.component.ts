@@ -22,16 +22,13 @@ export class UserConfirmComponent implements OnInit {
   constructor(
     private cryptoService: CryptoService,
     private logService: LogService,
-    private stateService: StateService
+    private stateService: StateService,
   ) {}
 
   async ngOnInit() {
     try {
       if (this.publicKey != null) {
-        const fingerprint = await this.cryptoService.getFingerprint(
-          this.userId,
-          this.publicKey.buffer
-        );
+        const fingerprint = await this.cryptoService.getFingerprint(this.userId, this.publicKey);
         if (fingerprint != null) {
           this.fingerprint = fingerprint.join("-");
         }

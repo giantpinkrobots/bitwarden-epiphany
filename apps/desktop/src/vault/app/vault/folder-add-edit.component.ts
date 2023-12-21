@@ -1,13 +1,13 @@
 import { Component } from "@angular/core";
 import { FormBuilder } from "@angular/forms";
 
-import { DialogServiceAbstraction } from "@bitwarden/angular/services/dialog";
 import { FolderAddEditComponent as BaseFolderAddEditComponent } from "@bitwarden/angular/vault/components/folder-add-edit.component";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { FolderApiServiceAbstraction } from "@bitwarden/common/vault/abstractions/folder/folder-api.service.abstraction";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
+import { DialogService } from "@bitwarden/components";
 
 @Component({
   selector: "app-folder-add-edit",
@@ -20,8 +20,8 @@ export class FolderAddEditComponent extends BaseFolderAddEditComponent {
     i18nService: I18nService,
     platformUtilsService: PlatformUtilsService,
     logService: LogService,
-    dialogService: DialogServiceAbstraction,
-    formBuilder: FormBuilder
+    dialogService: DialogService,
+    formBuilder: FormBuilder,
   ) {
     super(
       folderService,
@@ -30,7 +30,7 @@ export class FolderAddEditComponent extends BaseFolderAddEditComponent {
       platformUtilsService,
       logService,
       dialogService,
-      formBuilder
+      formBuilder,
     );
   }
 }

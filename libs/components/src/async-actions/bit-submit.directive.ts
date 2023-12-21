@@ -18,7 +18,7 @@ export class BitSubmitDirective implements OnInit, OnDestroy {
   private _loading$ = new BehaviorSubject<boolean>(false);
   private _disabled$ = new BehaviorSubject<boolean>(false);
 
-  @Input("bitSubmit") protected handler: FunctionReturningAwaitable;
+  @Input("bitSubmit") handler: FunctionReturningAwaitable;
 
   @Input() allowDisabledFormSubmit?: boolean = false;
 
@@ -28,7 +28,7 @@ export class BitSubmitDirective implements OnInit, OnDestroy {
   constructor(
     private formGroupDirective: FormGroupDirective,
     @Optional() validationService?: ValidationService,
-    @Optional() logService?: LogService
+    @Optional() logService?: LogService,
   ) {
     formGroupDirective.ngSubmit
       .pipe(
@@ -46,10 +46,10 @@ export class BitSubmitDirective implements OnInit, OnDestroy {
               logService?.error(`Async submit exception: ${err}`);
               validationService?.showError(err);
               return of(undefined);
-            })
+            }),
           );
         }),
-        takeUntil(this.destroy$)
+        takeUntil(this.destroy$),
       )
       .subscribe({
         next: () => (this.loading = false),

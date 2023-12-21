@@ -3,18 +3,18 @@ import { Component, Inject, OnDestroy, OnInit } from "@angular/core";
 import { FormBuilder, FormControl, Validators } from "@angular/forms";
 import { combineLatest, Subject, takeUntil } from "rxjs";
 
-import { DialogServiceAbstraction } from "@bitwarden/angular/services/dialog";
 import { OrganizationApiServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/organization/organization-api.service.abstraction";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { UserVerificationService } from "@bitwarden/common/auth/abstractions/user-verification/user-verification.service.abstraction";
+import { Verification } from "@bitwarden/common/auth/types/verification";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
-import { Verification } from "@bitwarden/common/types/verification";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
-import { CipherType } from "@bitwarden/common/vault/enums/cipher-type";
+import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+import { DialogService } from "@bitwarden/components";
 
 import { UserVerificationModule } from "../../../../auth/shared/components/user-verification";
 import { SharedModule } from "../../../../shared/shared.module";
@@ -93,7 +93,7 @@ export class DeleteOrganizationDialogComponent implements OnInit, OnDestroy {
     private cipherService: CipherService,
     private organizationService: OrganizationService,
     private organizationApiService: OrganizationApiServiceAbstraction,
-    private formBuilder: FormBuilder
+    private formBuilder: FormBuilder,
   ) {}
 
   ngOnDestroy(): void {
@@ -124,7 +124,7 @@ export class DeleteOrganizationDialogComponent implements OnInit, OnDestroy {
     this.platformUtilsService.showToast(
       "success",
       this.i18nService.t("organizationDeleted"),
-      this.i18nService.t("organizationDeletedDesc")
+      this.i18nService.t("organizationDeletedDesc"),
     );
     this.dialogRef.close(DeleteOrganizationDialogResult.Deleted);
   };
@@ -144,8 +144,8 @@ export class DeleteOrganizationDialogComponent implements OnInit, OnDestroy {
         organizationContentSummary.itemCountByType.push(
           new OrganizationContentSummaryItem(
             count,
-            this.getOrganizationItemLocalizationKeysByType(CipherType[cipherType])
-          )
+            this.getOrganizationItemLocalizationKeysByType(CipherType[cipherType]),
+          ),
         );
       }
     }
@@ -168,11 +168,11 @@ export class DeleteOrganizationDialogComponent implements OnInit, OnDestroy {
  * @param config Configuration for the dialog
  */
 export function openDeleteOrganizationDialog(
-  dialogService: DialogServiceAbstraction,
-  config: DialogConfig<DeleteOrganizationDialogParams>
+  dialogService: DialogService,
+  config: DialogConfig<DeleteOrganizationDialogParams>,
 ) {
   return dialogService.open<DeleteOrganizationDialogResult, DeleteOrganizationDialogParams>(
     DeleteOrganizationDialogComponent,
-    config
+    config,
   );
 }

@@ -8,11 +8,13 @@ import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CollectionService } from "@bitwarden/common/vault/abstractions/collection.service";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
-import { CipherType } from "@bitwarden/common/vault/enums/cipher-type";
+import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherRequest } from "@bitwarden/common/vault/models/request/cipher.request";
 import { CollectionWithIdRequest } from "@bitwarden/common/vault/models/request/collection-with-id.request";
 import { FolderWithIdRequest } from "@bitwarden/common/vault/models/request/folder-with-id.request";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+import { CollectionView } from "@bitwarden/common/vault/models/view/collection.view";
+import { FolderView } from "@bitwarden/common/vault/models/view/folder.view";
 
 import {
   AscendoCsvImporter,
@@ -60,6 +62,7 @@ import {
   PasswordDragonXmlImporter,
   PasswordSafeXmlImporter,
   PasswordWalletTxtImporter,
+  ProtonPassJsonImporter,
   PsonoJsonImporter,
   RememBearCsvImporter,
   RoboFormCsvImporter,
@@ -96,7 +99,7 @@ export class ImportService implements ImportServiceAbstraction {
     private importApiService: ImportApiServiceAbstraction,
     private i18nService: I18nService,
     private collectionService: CollectionService,
-    private cryptoService: CryptoService
+    private cryptoService: CryptoService,
   ) {}
 
   getImportOptions(): ImportOption[] {
@@ -106,7 +109,9 @@ export class ImportService implements ImportServiceAbstraction {
   async import(
     importer: Importer,
     fileContents: string,
-    organizationId: string = null
+    organizationId: string = null,
+    selectedImportTarget: string = null,
+    canAccessImportExport: boolean,
   ): Promise<ImportResult> {
     let importResult: ImportResult;
     try {
@@ -142,7 +147,21 @@ export class ImportService implements ImportServiceAbstraction {
       }
     }
 
+    if (
+      organizationId &&
+      Utils.isNullOrWhitespace(selectedImportTarget) &&
+      !canAccessImportExport
+    ) {
+      const hasUnassignedCollections = importResult.ciphers.some(
+        (c) => !Array.isArray(c.collectionIds) || c.collectionIds.length == 0,
+      );
+      if (hasUnassignedCollections) {
+        throw new Error(this.i18nService.t("importUnassignedItemsError"));
+      }
+    }
+
     try {
+      await this.setImportTarget(importResult, organizationId, selectedImportTarget);
       if (organizationId != null) {
         await this.handleOrganizationalImport(importResult, organizationId);
       } else {
@@ -158,7 +177,7 @@ export class ImportService implements ImportServiceAbstraction {
   getImporter(
     format: ImportType | "bitwardenpasswordprotected",
     promptForPassword_callback: () => Promise<string>,
-    organizationId: string = null
+    organizationId: string = null,
   ): Importer {
     if (promptForPassword_callback == null) {
       return null;
@@ -174,7 +193,7 @@ export class ImportService implements ImportServiceAbstraction {
 
   private getImporterInstance(
     format: ImportType | "bitwardenpasswordprotected",
-    promptForPassword_callback: () => Promise<string>
+    promptForPassword_callback: () => Promise<string>,
   ) {
     if (format == null) {
       return null;
@@ -188,7 +207,8 @@ export class ImportService implements ImportServiceAbstraction {
         return new BitwardenPasswordProtectedImporter(
           this.cryptoService,
           this.i18nService,
-          promptForPassword_callback
+          this.cipherService,
+          promptForPassword_callback,
         );
       case "lastpasscsv":
       case "passboltcsv":
@@ -305,6 +325,8 @@ export class ImportService implements ImportServiceAbstraction {
         return new PsonoJsonImporter();
       case "passkyjson":
         return new PasskyJsonImporter();
+      case "protonpass":
+        return new ProtonPassJsonImporter(this.i18nService);
       default:
         return null;
     }
@@ -324,7 +346,7 @@ export class ImportService implements ImportServiceAbstraction {
     }
     if (importResult.folderRelationships != null) {
       importResult.folderRelationships.forEach((r) =>
-        request.folderRelationships.push(new KvpRequest(r[0], r[1]))
+        request.folderRelationships.push(new KvpRequest(r[0], r[1])),
       );
     }
     return await this.importApiService.postImportCiphers(request);
@@ -346,7 +368,7 @@ export class ImportService implements ImportServiceAbstraction {
     }
     if (importResult.collectionRelationships != null) {
       importResult.collectionRelationships.forEach((r) =>
-        request.collectionRelationships.push(new KvpRequest(r[0], r[1]))
+        request.collectionRelationships.push(new KvpRequest(r[0], r[1])),
       );
     }
     return await this.importApiService.postImportOrganizationCiphers(organizationId, request);
@@ -402,5 +424,70 @@ export class ImportService implements ImportServiceAbstraction {
     });
 
     return new Error(errorMessage);
+  }
+
+  private async setImportTarget(
+    importResult: ImportResult,
+    organizationId: string,
+    importTarget: string,
+  ) {
+    if (Utils.isNullOrWhitespace(importTarget)) {
+      return;
+    }
+
+    if (organizationId) {
+      const collectionViews: CollectionView[] = await this.collectionService.getAllDecrypted();
+      const targetCollection = collectionViews.find((c) => c.id === importTarget);
+
+      const noCollectionRelationShips: [number, number][] = [];
+      importResult.ciphers.forEach((c, index) => {
+        if (!Array.isArray(c.collectionIds) || c.collectionIds.length == 0) {
+          c.collectionIds = [targetCollection.id];
+          noCollectionRelationShips.push([index, 0]);
+        }
+      });
+
+      const collections: CollectionView[] = [...importResult.collections];
+      importResult.collections = [targetCollection];
+      collections.map((x) => {
+        const f = new CollectionView();
+        f.name = `${targetCollection.name}/${x.name}`;
+        importResult.collections.push(f);
+      });
+
+      const relationships: [number, number][] = [...importResult.collectionRelationships];
+      importResult.collectionRelationships = [...noCollectionRelationShips];
+      relationships.map((x) => {
+        importResult.collectionRelationships.push([x[0], x[1] + 1]);
+      });
+
+      return;
+    }
+
+    const folderViews = await this.folderService.getAllDecryptedFromState();
+    const targetFolder = folderViews.find((f) => f.id === importTarget);
+
+    const noFolderRelationShips: [number, number][] = [];
+    importResult.ciphers.forEach((c, index) => {
+      if (Utils.isNullOrEmpty(c.folderId)) {
+        c.folderId = targetFolder.id;
+        noFolderRelationShips.push([index, 0]);
+      }
+    });
+
+    const folders: FolderView[] = [...importResult.folders];
+    importResult.folders = [targetFolder];
+    folders.map((x) => {
+      const newFolderName = `${targetFolder.name}/${x.name}`;
+      const f = new FolderView();
+      f.name = newFolderName;
+      importResult.folders.push(f);
+    });
+
+    const relationships: [number, number][] = [...importResult.folderRelationships];
+    importResult.folderRelationships = [...noFolderRelationShips];
+    relationships.map((x) => {
+      importResult.folderRelationships.push([x[0], x[1] + 1]);
+    });
   }
 }

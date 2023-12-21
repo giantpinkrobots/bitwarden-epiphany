@@ -56,7 +56,10 @@ export class MultiSelectComponent implements OnInit, BitFormFieldControl, Contro
 
   @Output() onItemsConfirmed = new EventEmitter<any[]>();
 
-  constructor(private i18nService: I18nService, @Optional() @Self() private ngControl?: NgControl) {
+  constructor(
+    private i18nService: I18nService,
+    @Optional() @Self() private ngControl?: NgControl,
+  ) {
     if (ngControl != null) {
       ngControl.valueAccessor = this;
     }
@@ -72,12 +75,6 @@ export class MultiSelectComponent implements OnInit, BitFormFieldControl, Contro
   /** Needs to be arrow function to retain `this` scope. */
   keyDown = (event: KeyboardEvent) => {
     if (!this.select.isOpen && event.key === "Enter" && !hasModifierKey(event)) {
-      return false;
-    }
-
-    if (this.select.isOpen && event.key === "Enter" && !hasModifierKey(event)) {
-      this.select.close();
-      event.preventDefault();
       return false;
     }
 

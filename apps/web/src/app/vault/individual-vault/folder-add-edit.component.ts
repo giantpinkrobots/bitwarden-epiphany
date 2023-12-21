@@ -2,13 +2,13 @@ import { DIALOG_DATA, DialogConfig, DialogRef } from "@angular/cdk/dialog";
 import { Component, Inject } from "@angular/core";
 import { FormBuilder } from "@angular/forms";
 
-import { DialogServiceAbstraction, SimpleDialogType } from "@bitwarden/angular/services/dialog";
 import { FolderAddEditComponent as BaseFolderAddEditComponent } from "@bitwarden/angular/vault/components/folder-add-edit.component";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { FolderApiServiceAbstraction } from "@bitwarden/common/vault/abstractions/folder/folder-api.service.abstraction";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
+import { DialogService } from "@bitwarden/components";
 
 @Component({
   selector: "app-folder-add-edit",
@@ -22,10 +22,10 @@ export class FolderAddEditComponent extends BaseFolderAddEditComponent {
     i18nService: I18nService,
     platformUtilsService: PlatformUtilsService,
     logService: LogService,
-    dialogService: DialogServiceAbstraction,
+    dialogService: DialogService,
     formBuilder: FormBuilder,
     protected dialogRef: DialogRef<FolderAddEditDialogResult>,
-    @Inject(DIALOG_DATA) params: FolderAddEditDialogParams
+    @Inject(DIALOG_DATA) params: FolderAddEditDialogParams,
   ) {
     super(
       folderService,
@@ -34,7 +34,7 @@ export class FolderAddEditComponent extends BaseFolderAddEditComponent {
       platformUtilsService,
       logService,
       dialogService,
-      formBuilder
+      formBuilder,
     );
     params?.folderId ? (this.folderId = params.folderId) : null;
   }
@@ -43,7 +43,7 @@ export class FolderAddEditComponent extends BaseFolderAddEditComponent {
     const confirmed = await this.dialogService.openSimpleDialog({
       title: { key: "deleteFolder" },
       content: { key: "deleteFolderConfirmation" },
-      type: SimpleDialogType.WARNING,
+      type: "warning",
     });
 
     if (!confirmed) {
@@ -76,7 +76,7 @@ export class FolderAddEditComponent extends BaseFolderAddEditComponent {
       this.platformUtilsService.showToast(
         "success",
         null,
-        this.i18nService.t(this.editMode ? "editedFolder" : "addedFolder")
+        this.i18nService.t(this.editMode ? "editedFolder" : "addedFolder"),
       );
       this.onSavedFolder.emit(this.folder);
       this.dialogRef.close(FolderAddEditDialogResult.Saved);
@@ -103,11 +103,11 @@ export enum FolderAddEditDialogResult {
  * @param config Optional configuration for the dialog
  */
 export function openFolderAddEditDialog(
-  dialogService: DialogServiceAbstraction,
-  config?: DialogConfig<FolderAddEditDialogParams>
+  dialogService: DialogService,
+  config?: DialogConfig<FolderAddEditDialogParams>,
 ) {
   return dialogService.open<FolderAddEditDialogResult, FolderAddEditDialogParams>(
     FolderAddEditComponent,
-    config
+    config,
   );
 }

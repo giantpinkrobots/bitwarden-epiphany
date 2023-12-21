@@ -27,7 +27,7 @@ export class CollectionsComponent implements OnInit {
     protected platformUtilsService: PlatformUtilsService,
     protected i18nService: I18nService,
     protected cipherService: CipherService,
-    private logService: LogService
+    private logService: LogService,
   ) {}
 
   async ngOnInit() {
@@ -37,7 +37,9 @@ export class CollectionsComponent implements OnInit {
   async load() {
     this.cipherDomain = await this.loadCipher();
     this.collectionIds = this.loadCipherCollections();
-    this.cipher = await this.cipherDomain.decrypt();
+    this.cipher = await this.cipherDomain.decrypt(
+      await this.cipherService.getKeyForCipherKeyDecryption(this.cipherDomain),
+    );
     this.collections = await this.loadCollections();
 
     this.collections.forEach((c) => ((c as any).checked = false));
@@ -56,7 +58,7 @@ export class CollectionsComponent implements OnInit {
       this.platformUtilsService.showToast(
         "error",
         this.i18nService.t("errorOccurred"),
-        this.i18nService.t("selectOneCollection")
+        this.i18nService.t("selectOneCollection"),
       );
       return;
     }
@@ -82,7 +84,7 @@ export class CollectionsComponent implements OnInit {
   protected async loadCollections() {
     const allCollections = await this.collectionService.getAllDecrypted();
     return allCollections.filter(
-      (c) => !c.readOnly && c.organizationId === this.cipher.organizationId
+      (c) => !c.readOnly && c.organizationId === this.cipher.organizationId,
     );
   }
 

@@ -142,6 +142,18 @@
             </button>
           </div>
         </div>
+
+        <!--Passkey-->
+        <div class="box" *ngIf="cipher.login.hasFido2Credentials">
+          <div class="box-content">
+            <div class="box-content-row text-muted">
+              <span class="row-label">{{ "typePasskey" | i18n }}</span>
+              {{ "dateCreated" | i18n }}
+              {{ cipher.login.fido2Credentials[0].creationDate | date: "short" }}
+            </div>
+          </div>
+        </div>
+
         <div
           class="box-content-row box-content-row-flex totp"
           [ngClass]="{ low: totpLow }"
@@ -190,7 +202,6 @@
             </button>
           </div>
         </div>
-
         <div class="box-content-row box-content-row-flex totp" *ngIf="showPremiumRequiredTotp">
           <div class="row-main">
             <span class="row-label">{{ "verificationCodeTotp" | i18n }}</span>
@@ -222,10 +233,10 @@
               >{{ "number" | i18n }}</span
             >
             <span [hidden]="showCardNumber" class="monospaced">{{
-              cipher.card.maskedNumber | creditCardNumber : cipher.card.brand
+              cipher.card.maskedNumber | creditCardNumber: cipher.card.brand
             }}</span>
             <span [hidden]="!showCardNumber" class="monospaced">{{
-              cipher.card.number | creditCardNumber : cipher.card.brand
+              cipher.card.number | creditCardNumber: cipher.card.brand
             }}</span>
           </div>
           <div class="action-buttons">
@@ -555,7 +566,11 @@
         class="box-content-row"
         appStopClick
         (click)="fillCipher()"
-        *ngIf="cipher.type !== cipherType.SecureNote && !cipher.isDeleted && !inPopout"
+        *ngIf="
+          cipher.type !== cipherType.SecureNote &&
+          !cipher.isDeleted &&
+          (!this.inPopout || this.loadAction)
+        "
       >
         <div class="row-main text-primary">
           <div class="icon text-primary" aria-hidden="true">
@@ -640,15 +655,15 @@
     <div class="box-footer">
       <div>
         <b class="font-weight-semibold">{{ "dateUpdated" | i18n }}:</b>
-        {{ cipher.revisionDate | date : "medium" }}
+        {{ cipher.revisionDate | date: "medium" }}
       </div>
       <div *ngIf="cipher.creationDate">
         <b class="font-weight-semibold">{{ "dateCreated" | i18n }}:</b>
-        {{ cipher.creationDate | date : "medium" }}
+        {{ cipher.creationDate | date: "medium" }}
       </div>
       <div *ngIf="cipher.passwordRevisionDisplayDate">
         <b class="font-weight-semibold">{{ "datePasswordUpdated" | i18n }}:</b>
-        {{ cipher.passwordRevisionDisplayDate | date : "medium" }}
+        {{ cipher.passwordRevisionDisplayDate | date: "medium" }}
       </div>
       <div *ngIf="cipher.hasPasswordHistory">
         <b class="font-weight-semibold">{{ "passwordHistory" | i18n }}:</b>

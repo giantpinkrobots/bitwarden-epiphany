@@ -11,15 +11,16 @@ import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/pl
 import { StateService } from "@bitwarden/common/platform/abstractions/state.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
-import { PasswordRepromptService } from "@bitwarden/common/vault/abstractions/password-reprompt.service";
 import { SyncService } from "@bitwarden/common/vault/abstractions/sync/sync.service.abstraction";
+import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums/cipher-reprompt-type";
-import { CipherType } from "@bitwarden/common/vault/enums/cipher-type";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+import { PasswordRepromptService } from "@bitwarden/vault";
 
 import { AutofillService } from "../../../../autofill/services/abstractions/autofill.service";
+import { AutofillOverlayVisibility } from "../../../../autofill/utils/autofill-overlay.enum";
 import { BrowserApi } from "../../../../platform/browser/browser-api";
-import { PopupUtilsService } from "../../../../popup/services/popup-utils.service";
+import BrowserPopupUtils from "../../../../platform/popup/browser-popup-utils";
 import { VaultFilterService } from "../../../services/vault-filter.service";
 
 const BroadcasterSubscriptionId = "CurrentTabComponent";
@@ -55,7 +56,6 @@ export class CurrentTabComponent implements OnInit, OnDestroy {
   constructor(
     private platformUtilsService: PlatformUtilsService,
     private cipherService: CipherService,
-    private popupUtilsService: PopupUtilsService,
     private autofillService: AutofillService,
     private i18nService: I18nService,
     private router: Router,
@@ -67,12 +67,12 @@ export class CurrentTabComponent implements OnInit, OnDestroy {
     private stateService: StateService,
     private passwordRepromptService: PasswordRepromptService,
     private organizationService: OrganizationService,
-    private vaultFilterService: VaultFilterService
+    private vaultFilterService: VaultFilterService,
   ) {}
 
   async ngOnInit() {
     this.searchTypeSearch = !this.platformUtilsService.isSafari();
-    this.inSidebar = this.popupUtilsService.inSidebar(window);
+    this.inSidebar = BrowserPopupUtils.inSidebar(window);
 
     this.broadcasterService.subscribe(BroadcasterSubscriptionId, (message: any) => {
       this.ngZone.run(async () => {
@@ -124,7 +124,7 @@ export class CurrentTabComponent implements OnInit, OnDestroy {
       this.platformUtilsService.showToast(
         "info",
         null,
-        this.i18nService.t("autofillPageLoadPolicyActivated")
+        this.i18nService.t("autofillPageLoadPolicyActivated"),
       );
     }
   }
@@ -185,7 +185,7 @@ export class CurrentTabComponent implements OnInit, OnDestroy {
       if (this.totpCode != null) {
         this.platformUtilsService.copyToClipboard(this.totpCode, { window: window });
       }
-      if (this.popupUtilsService.inPopup(window)) {
+      if (BrowserPopupUtils.inPopup(window)) {
         if (!closePopupDelay) {
           if (this.platformUtilsService.isFirefox() || this.platformUtilsService.isSafari()) {
             BrowserApi.closePopup(window);
@@ -252,7 +252,7 @@ export class CurrentTabComponent implements OnInit, OnDestroy {
 
     const ciphers = await this.cipherService.getAllDecryptedForUrl(
       this.url,
-      otherTypes.length > 0 ? otherTypes : null
+      otherTypes.length > 0 ? otherTypes : null,
     );
 
     this.loginCiphers = [];
@@ -278,7 +278,7 @@ export class CurrentTabComponent implements OnInit, OnDestroy {
     });
 
     this.loginCiphers = this.loginCiphers.sort((a, b) =>
-      this.cipherService.sortCiphersByLastUsedThenName(a, b)
+      this.cipherService.sortCiphersByLastUsedThenName(a, b),
     );
     this.isLoading = this.loaded = true;
   }
@@ -295,6 +295,7 @@ export class CurrentTabComponent implements OnInit, OnDestroy {
   private async setCallout() {
     this.showHowToAutofill =
       this.loginCiphers.length > 0 &&
+      (await this.stateService.getAutoFillOverlayVisibility()) === AutofillOverlayVisibility.Off &&
       !(await this.stateService.getEnableAutoFillOnPageLoad()) &&
       !(await this.stateService.getDismissedAutofillCallout());
 

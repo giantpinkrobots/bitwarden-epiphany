@@ -12,12 +12,9 @@ export class PolicyApiServiceAbstraction {
     organizationId: string,
     token: string,
     email: string,
-    organizationUserId: string
+    organizationUserId: string,
   ) => Promise<ListResponse<PolicyResponse>>;
-  getPoliciesByInvitedUser: (
-    organizationId: string,
-    userId: string
-  ) => Promise<ListResponse<PolicyResponse>>;
-  getMasterPasswordPoliciesForInvitedUsers: (orgId: string) => Promise<MasterPasswordPolicyOptions>;
+
+  getMasterPasswordPolicyOptsForOrgUser: (orgId: string) => Promise<MasterPasswordPolicyOptions>;
   putPolicy: (organizationId: string, type: PolicyType, request: PolicyRequest) => Promise<any>;
 }

@@ -2,7 +2,7 @@
   "manifest_version": 2,
   "name": "__MSG_extName__",
   "short_name": "__MSG_appName__",
-  "version": "2023.7.1",
+  "version": "2023.12.1",
   "description": "__MSG_extDesc__",
   "default_locale": "en",
   "author": "Bitwarden Inc.",
@@ -18,17 +18,9 @@
     {
       "all_frames": true,
       "js": [
-        "content/autofill.js",
-        "content/autofiller.js",
-        "content/notificationBar.js",
-        "content/contextMenuHandler.js"
+        "content/trigger-autofill-script-injection.js",
+        "content/fido2/trigger-fido2-content-script-injection.js"
       ],
-      "matches": ["http://*/*", "https://*/*", "file:///*"],
-      "run_at": "document_start"
-    },
-    {
-      "all_frames": false,
-      "js": ["content/message_handler.js"],
       "matches": ["http://*/*", "https://*/*", "file:///*"],
       "run_at": "document_start"
     },
@@ -66,6 +58,10 @@
   ],
   "optional_permissions": ["nativeMessaging"],
   "content_security_policy": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
+  "sandbox": {
+    "pages": ["overlay/button.html", "overlay/list.html"],
+    "content_security_policy": "sandbox allow-scripts; script-src 'self'"
+  },
   "commands": {
     "_execute_browser_action": {
       "suggested_key": {
@@ -98,14 +94,18 @@
     }
   },
   "web_accessible_resources": [
+    "content/fido2/page-script.js",
     "notification/bar.html",
     "images/icon38.png",
-    "images/icon38_locked.png"
+    "images/icon38_locked.png",
+    "overlay/button.html",
+    "overlay/list.html",
+    "popup/fonts/*"
   ],
   "applications": {
     "gecko": {
       "id": "{446900e4-71c2-419f-a6a7-df9c091e268b}",
-      "strict_min_version": "42.0"
+      "strict_min_version": "91.0"
     }
   },
   "sidebar_action": {

@@ -32,7 +32,7 @@ export class Attachment extends Domain {
         fileName: null,
         key: null,
       },
-      ["id", "url", "sizeName"]
+      ["id", "url", "sizeName"],
     );
   }
 
@@ -43,7 +43,7 @@ export class Attachment extends Domain {
         fileName: null,
       },
       orgId,
-      encKey
+      encKey,
     );
 
     if (this.key != null) {
@@ -71,7 +71,7 @@ export class Attachment extends Domain {
     const cryptoService = Utils.getContainerService().getCryptoService();
     return orgId != null
       ? await cryptoService.getOrgKey(orgId)
-      : await cryptoService.getKeyForUserEncryption();
+      : await cryptoService.getUserKeyWithLegacySupport();
   }
 
   toAttachmentData(): AttachmentData {
@@ -87,7 +87,7 @@ export class Attachment extends Domain {
         fileName: null,
         key: null,
       },
-      ["id", "url", "sizeName"]
+      ["id", "url", "sizeName"],
     );
     return a;
   }

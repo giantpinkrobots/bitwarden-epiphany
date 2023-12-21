@@ -4,67 +4,84 @@ import { SymmetricCryptoKey } from "../models/domain/symmetric-crypto-key";
 
 export abstract class CryptoFunctionService {
   pbkdf2: (
-    password: string | ArrayBuffer,
-    salt: string | ArrayBuffer,
+    password: string | Uint8Array,
+    salt: string | Uint8Array,
     algorithm: "sha256" | "sha512",
-    iterations: number
-  ) => Promise<ArrayBuffer>;
+    iterations: number,
+  ) => Promise<Uint8Array>;
   argon2: (
-    password: string | ArrayBuffer,
-    salt: string | ArrayBuffer,
+    password: string | Uint8Array,
+    salt: string | Uint8Array,
     iterations: number,
     memory: number,
-    parallelism: number
-  ) => Promise<ArrayBuffer>;
+    parallelism: number,
+  ) => Promise<Uint8Array>;
   hkdf: (
-    ikm: ArrayBuffer,
-    salt: string | ArrayBuffer,
-    info: string | ArrayBuffer,
+    ikm: Uint8Array,
+    salt: string | Uint8Array,
+    info: string | Uint8Array,
     outputByteSize: number,
-    algorithm: "sha256" | "sha512"
-  ) => Promise<ArrayBuffer>;
+    algorithm: "sha256" | "sha512",
+  ) => Promise<Uint8Array>;
   hkdfExpand: (
-    prk: ArrayBuffer,
-    info: string | ArrayBuffer,
+    prk: Uint8Array,
+    info: string | Uint8Array,
     outputByteSize: number,
-    algorithm: "sha256" | "sha512"
-  ) => Promise<ArrayBuffer>;
+    algorithm: "sha256" | "sha512",
+  ) => Promise<Uint8Array>;
   hash: (
-    value: string | ArrayBuffer,
-    algorithm: "sha1" | "sha256" | "sha512" | "md5"
-  ) => Promise<ArrayBuffer>;
+    value: string | Uint8Array,
+    algorithm: "sha1" | "sha256" | "sha512" | "md5",
+  ) => Promise<Uint8Array>;
   hmac: (
-    value: ArrayBuffer,
-    key: ArrayBuffer,
-    algorithm: "sha1" | "sha256" | "sha512"
-  ) => Promise<ArrayBuffer>;
-  compare: (a: ArrayBuffer, b: ArrayBuffer) => Promise<boolean>;
+    value: Uint8Array,
+    key: Uint8Array,
+    algorithm: "sha1" | "sha256" | "sha512",
+  ) => Promise<Uint8Array>;
+  compare: (a: Uint8Array, b: Uint8Array) => Promise<boolean>;
   hmacFast: (
-    value: ArrayBuffer | string,
-    key: ArrayBuffer | string,
-    algorithm: "sha1" | "sha256" | "sha512"
-  ) => Promise<ArrayBuffer | string>;
-  compareFast: (a: ArrayBuffer | string, b: ArrayBuffer | string) => Promise<boolean>;
-  aesEncrypt: (data: ArrayBuffer, iv: ArrayBuffer, key: ArrayBuffer) => Promise<ArrayBuffer>;
+    value: Uint8Array | string,
+    key: Uint8Array | string,
+    algorithm: "sha1" | "sha256" | "sha512",
+  ) => Promise<Uint8Array | string>;
+  compareFast: (a: Uint8Array | string, b: Uint8Array | string) => Promise<boolean>;
+  aesEncrypt: (data: Uint8Array, iv: Uint8Array, key: Uint8Array) => Promise<Uint8Array>;
   aesDecryptFastParameters: (
     data: string,
     iv: string,
     mac: string,
-    key: SymmetricCryptoKey
-  ) => DecryptParameters<ArrayBuffer | string>;
-  aesDecryptFast: (parameters: DecryptParameters<ArrayBuffer | string>) => Promise<string>;
-  aesDecrypt: (data: ArrayBuffer, iv: ArrayBuffer, key: ArrayBuffer) => Promise<ArrayBuffer>;
+    key: SymmetricCryptoKey,
+  ) => DecryptParameters<Uint8Array | string>;
+  aesDecryptFast: (
+    parameters: DecryptParameters<Uint8Array | string>,
+    mode: "cbc" | "ecb",
+  ) => Promise<string>;
+  aesDecrypt: (
+    data: Uint8Array,
+    iv: Uint8Array,
+    key: Uint8Array,
+    mode: "cbc" | "ecb",
+  ) => Promise<Uint8Array>;
   rsaEncrypt: (
-    data: ArrayBuffer,
-    publicKey: ArrayBuffer,
-    algorithm: "sha1" | "sha256"
-  ) => Promise<ArrayBuffer>;
+    data: Uint8Array,
+    publicKey: Uint8Array,
+    algorithm: "sha1" | "sha256",
+  ) => Promise<Uint8Array>;
   rsaDecrypt: (
-    data: ArrayBuffer,
-    privateKey: ArrayBuffer,
-    algorithm: "sha1" | "sha256"
-  ) => Promise<ArrayBuffer>;
-  rsaExtractPublicKey: (privateKey: ArrayBuffer) => Promise<ArrayBuffer>;
-  rsaGenerateKeyPair: (length: 1024 | 2048 | 4096) => Promise<[ArrayBuffer, ArrayBuffer]>;
+    data: Uint8Array,
+    privateKey: Uint8Array,
+    algorithm: "sha1" | "sha256",
+  ) => Promise<Uint8Array>;
+  rsaExtractPublicKey: (privateKey: Uint8Array) => Promise<Uint8Array>;
+  rsaGenerateKeyPair: (length: 1024 | 2048 | 4096) => Promise<[Uint8Array, Uint8Array]>;
+  /**
+   * Generates a key of the given length suitable for use in AES encryption
+   */
+  aesGenerateKey: (bitLength: 128 | 192 | 256 | 512) => Promise<CsprngArray>;
+  /**
+   * Generates a random array of bytes of the given length. Uses a cryptographically secure random number generator.
+   *
+   * Do not use this for generating encryption keys. Use aesGenerateKey or rsaGenerateKeyPair instead.
+   */
   randomBytes: (length: number) => Promise<CsprngArray>;
 }

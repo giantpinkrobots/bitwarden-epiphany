@@ -55,7 +55,7 @@ export const TwoFactorProviders: Partial<Record<TwoFactorProviderType, TwoFactor
       description: null as string,
       priority: 4,
       sort: 5,
-      premium: true,
+      premium: false,
     },
   };
 
@@ -65,7 +65,7 @@ export class TwoFactorService implements TwoFactorServiceAbstraction {
 
   constructor(
     private i18nService: I18nService,
-    private platformUtilsService: PlatformUtilsService
+    private platformUtilsService: PlatformUtilsService,
   ) {}
 
   init() {

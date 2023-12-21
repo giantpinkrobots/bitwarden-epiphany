@@ -1,9 +1,13 @@
 import * as fs from "fs";
 
 import { ipcMain } from "electron";
+import { Subject } from "rxjs";
 
-import { NodeUtils } from "@bitwarden/common/misc/nodeUtils";
-import { AbstractStorageService } from "@bitwarden/common/platform/abstractions/storage.service";
+import {
+  AbstractStorageService,
+  StorageUpdate,
+} from "@bitwarden/common/platform/abstractions/storage.service";
+import { NodeUtils } from "@bitwarden/node/node-utils";
 
 // See: https://github.com/sindresorhus/electron-store/blob/main/index.d.ts
 interface ElectronStoreOptions {
@@ -35,6 +39,8 @@ type Options = BaseOptions<"get"> | BaseOptions<"has"> | SaveOptions | BaseOptio
 
 export class ElectronStorageService implements AbstractStorageService {
   private store: ElectronStore;
+  private updatesSubject = new Subject<StorageUpdate>();
+  updates$;
 
   constructor(dir: string, defaults = {}) {
     if (!fs.existsSync(dir)) {
@@ -45,6 +51,7 @@ export class ElectronStorageService implements AbstractStorageService {
       name: "data",
     };
     this.store = new Store(storeConfig);
+    this.updates$ = this.updatesSubject.asObservable();
 
     ipcMain.handle("storageService", (event, options: Options) => {
       switch (options.action) {
@@ -58,6 +65,10 @@ export class ElectronStorageService implements AbstractStorageService {
           return this.remove(options.key);
       }
     });
+  }
+
+  get valuesRequireDeserialization(): boolean {
+    return true;
   }
 
   get<T>(key: string): Promise<T> {
@@ -75,11 +86,13 @@ export class ElectronStorageService implements AbstractStorageService {
       obj = Array.from(obj);
     }
     this.store.set(key, obj);
+    this.updatesSubject.next({ key, updateType: "save" });
     return Promise.resolve();
   }
 
   remove(key: string): Promise<void> {
     this.store.delete(key);
+    this.updatesSubject.next({ key, updateType: "remove" });
     return Promise.resolve();
   }
 }

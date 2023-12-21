@@ -1,8 +1,10 @@
-import AddLoginRuntimeMessage from "../../background/models/addLoginRuntimeMessage";
-import ChangePasswordRuntimeMessage from "../../background/models/changePasswordRuntimeMessage";
 import AutofillField from "../models/autofill-field";
 import { WatchedForm } from "../models/watched-form";
+import AddLoginRuntimeMessage from "../notification/models/add-login-runtime-message";
+import ChangePasswordRuntimeMessage from "../notification/models/change-password-runtime-message";
 import { FormData } from "../services/abstractions/autofill.service";
+import { GlobalSettings, UserSettings } from "../types";
+import { getFromLocalStorage, setupExtensionDisconnectAction } from "../utils";
 
 interface HTMLElementWithFormOpId extends HTMLElement {
   formOpId: string;
@@ -26,13 +28,13 @@ interface HTMLElementWithFormOpId extends HTMLElement {
  * and async scripts to finish loading.
  * https://developer.mozilla.org/en-US/docs/Web/API/Window/DOMContentLoaded_event
  */
-document.addEventListener("DOMContentLoaded", (event) => {
-  // Do not show the notification bar on the Bitwarden vault
-  // because they can add logins and change passwords there
-  if (window.location.hostname.endsWith("vault.bitwarden.com")) {
-    return;
-  }
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", loadNotificationBar);
+} else {
+  loadNotificationBar();
+}
 
+async function loadNotificationBar() {
   // Initialize required variables and set default values
   const watchedForms: WatchedForm[] = [];
   let barType: string = null;
@@ -81,48 +83,54 @@ document.addEventListener("DOMContentLoaded", (event) => {
   // and they are set in the Settings > Options page in the browser extension.
   let disabledAddLoginNotification = false;
   let disabledChangedPasswordNotification = false;
+  let showNotificationBar = true;
 
   // Look up the active user id from storage
   const activeUserIdKey = "activeUserId";
+  const globalStorageKey = "global";
   let activeUserId: string;
-  chrome.storage.local.get(activeUserIdKey, (obj: any) => {
-    if (obj == null || obj[activeUserIdKey] == null) {
-      return;
-    }
-    activeUserId = obj[activeUserIdKey];
-  });
+
+  const activeUserStorageValue = await getFromLocalStorage(activeUserIdKey);
+  if (activeUserStorageValue[activeUserIdKey]) {
+    activeUserId = activeUserStorageValue[activeUserIdKey];
+  }
 
   // Look up the user's settings from storage
-  chrome.storage.local.get(activeUserId, (obj: any) => {
-    if (obj?.[activeUserId] == null) {
-      return;
+  const userSettingsStorageValue = await getFromLocalStorage(activeUserId);
+  if (userSettingsStorageValue[activeUserId]) {
+    const userSettings: UserSettings = userSettingsStorageValue[activeUserId].settings;
+    const globalSettings: GlobalSettings = (await getFromLocalStorage(globalStorageKey))[
+      globalStorageKey
+    ];
+
+    // Do not show the notification bar on the Bitwarden vault
+    // because they can add logins and change passwords there
+    if (window.location.origin === userSettings.serverConfig.environment.vault) {
+      showNotificationBar = false;
+    } else {
+      // NeverDomains is a dictionary of domains that the user has chosen to never
+      // show the notification bar on (for login detail collection or password change).
+      // It is managed in the Settings > Excluded Domains page in the browser extension.
+      // Example: '{"bitwarden.com":null}'
+      const excludedDomainsDict = globalSettings.neverDomains;
+      if (!excludedDomainsDict || !(window.location.hostname in excludedDomainsDict)) {
+        // Set local disabled preferences
+        disabledAddLoginNotification = globalSettings.disableAddLoginNotification;
+        disabledChangedPasswordNotification = globalSettings.disableChangedPasswordNotification;
+
+        if (!disabledAddLoginNotification || !disabledChangedPasswordNotification) {
+          // If the user has not disabled both notifications, then handle the initial page change (null -> actual page)
+          handlePageChange();
+        }
+      }
     }
+  }
 
-    const userSettings = obj[activeUserId].settings;
+  setupExtensionDisconnectAction(handleExtensionDisconnection);
 
-    // NeverDomains is a dictionary of domains that the user has chosen to never
-    // show the notification bar on (for login detail collection or password change).
-    // It is managed in the Settings > Excluded Domains page in the browser extension.
-    // Example: '{"bitwarden.com":null}'
-    const excludedDomainsDict = userSettings.neverDomains;
-
-    if (
-      excludedDomainsDict != null &&
-      // eslint-disable-next-line
-      excludedDomainsDict.hasOwnProperty(window.location.hostname)
-    ) {
-      return;
-    }
-
-    // Set local disabled preferences
-    disabledAddLoginNotification = userSettings.disableAddLoginNotification;
-    disabledChangedPasswordNotification = userSettings.disableChangedPasswordNotification;
-
-    if (!disabledAddLoginNotification || !disabledChangedPasswordNotification) {
-      // If the user has not disabled both notifications, then handle the initial page change (null -> actual page)
-      handlePageChange();
-    }
-  });
+  if (!showNotificationBar) {
+    return;
+  }
 
   // Message Processing
 
@@ -324,6 +332,10 @@ document.addEventListener("DOMContentLoaded", (event) => {
       // On first load or page change, start observing the DOM as early as possible
       // to avoid missing any forms that are added after the page loads
       observeDom();
+
+      sendPlatformMessage({
+        command: "checkNotificationQueue",
+      });
     }
 
     // This is a safeguard in case the observer misses a SPA page change.
@@ -439,7 +451,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
     // know what type of form we are watching
     const submitButton = getSubmitButton(
       form,
-      unionSets(logInButtonNames, changePasswordButtonNames)
+      unionSets(logInButtonNames, changePasswordButtonNames),
     );
 
     if (submitButton != null) {
@@ -469,7 +481,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
         watchedForm.formEl,
         watchedForm.data.password,
         inputs,
-        true // Only do fallback if we have expect to find a single password field
+        true, // Only do fallback if we have expect to find a single password field
       );
     } else if (watchedForm.data.passwords != null) {
       // if we didn't find a username field, try to locate multiple password fields
@@ -493,7 +505,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
     form: HTMLFormElement,
     passwordData: AutofillField,
     inputs: HTMLInputElement[],
-    doLastFallback: boolean
+    doLastFallback: boolean,
   ): HTMLInputElement {
     let el = locateField(form, passwordData, inputs);
     if (el != null && el.type !== "password") {
@@ -515,7 +527,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
   function locateField(
     form: HTMLFormElement,
     fieldData: AutofillField,
-    inputs: HTMLInputElement[]
+    inputs: HTMLInputElement[],
   ): HTMLInputElement | null {
     // If we have no field data, we cannot locate the field
     if (fieldData == null) {
@@ -661,7 +673,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
             // Check if the submit button contains any of the change password button names as a safeguard
             const buttonText = getButtonText(getSubmitButton(form, changePasswordButtonNames));
             const matches = Array.from(changePasswordButtonContainsNames).filter(
-              (n) => buttonText.indexOf(n) > -1
+              (n) => buttonText.indexOf(n) > -1,
             );
 
             if (matches.length > 0) {
@@ -738,8 +750,8 @@ document.addEventListener("DOMContentLoaded", (event) => {
     if (submitButton == null) {
       const possibleSubmitButtons = Array.from(
         wrappingEl.querySelectorAll(
-          'a, span, button[type="button"], ' + 'input[type="button"], button:not([type])'
-        )
+          'a, span, button[type="button"], ' + 'input[type="button"], button:not([type])',
+        ),
       ) as HTMLElement[];
       let typelessButton: HTMLElement = null;
       // Loop through all possible submit buttons and find the first one that matches a submit button name
@@ -834,6 +846,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
       isVaultLocked: typeData.isVaultLocked,
       theme: typeData.theme,
       removeIndividualVault: typeData.removeIndividualVault,
+      webVaultURL: typeData.webVaultURL,
     };
     const barQueryString = new URLSearchParams(barQueryParams).toString();
     const barPage = "notification/bar.html?" + barQueryString;
@@ -992,5 +1005,23 @@ document.addEventListener("DOMContentLoaded", (event) => {
     return theEl === document;
   }
 
+  function handleExtensionDisconnection(port: chrome.runtime.Port) {
+    closeBar(false);
+    clearTimeout(domObservationCollectTimeoutId);
+    clearTimeout(collectPageDetailsTimeoutId);
+    clearTimeout(handlePageChangeTimeoutId);
+    observer?.disconnect();
+    observer = null;
+    watchedForms.forEach((wf: WatchedForm) => {
+      const form = wf.formEl;
+      form.removeEventListener("submit", formSubmitted, false);
+      const submitButton = getSubmitButton(
+        form,
+        unionSets(logInButtonNames, changePasswordButtonNames),
+      );
+      submitButton?.removeEventListener("click", formSubmitted, false);
+    });
+  }
+
   // End Helper Functions
-});
+}

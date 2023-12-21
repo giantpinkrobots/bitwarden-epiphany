@@ -1,19 +1,21 @@
+import { OrganizationUserUserDetailsResponse } from "@bitwarden/common/admin-console/abstractions/organization-user/responses";
 import {
   OrganizationUserStatusType,
   OrganizationUserType,
 } from "@bitwarden/common/admin-console/enums";
 import { SelectItemView } from "@bitwarden/components";
 
-import { CollectionAccessSelectionView } from "../../../core";
+import { CollectionAccessSelectionView, GroupView } from "../../../core";
 
 /**
- * Permission options that replace/correspond with readOnly and hidePassword server fields.
+ * Permission options that replace/correspond with manage, readOnly, and hidePassword server fields.
  */
 export enum CollectionPermission {
   View = "view",
   ViewExceptPass = "viewExceptPass",
   Edit = "edit",
   EditExceptPass = "editExceptPass",
+  Manage = "manage",
 }
 
 export enum AccessItemType {
@@ -31,41 +33,40 @@ export enum AccessItemType {
  * and then joined back with the base type.
  *
  */
-export type AccessItemView =
-  | SelectItemView & {
-      /**
-       * Flag that this group/member can access all items.
-       * This will disable the permission editor for this item.
-       */
-      accessAllItems?: boolean;
+export type AccessItemView = SelectItemView & {
+  /**
+   * Flag that this group/member can access all items.
+   * This will disable the permission editor for this item.
+   */
+  accessAllItems?: boolean;
 
-      /**
-       * Flag that this item cannot be modified.
-       * This will disable the permission editor and will keep
-       * the item always selected.
-       */
-      readonly?: boolean;
+  /**
+   * Flag that this item cannot be modified.
+   * This will disable the permission editor and will keep
+   * the item always selected.
+   */
+  readonly?: boolean;
 
-      /**
-       * Optional permission that will be rendered for this
-       * item if it set to readonly.
-       */
-      readonlyPermission?: CollectionPermission;
-    } & (
-        | {
-            type: AccessItemType.Collection;
-            viaGroupName?: string;
-          }
-        | {
-            type: AccessItemType.Group;
-          }
-        | {
-            type: AccessItemType.Member; // Members have a few extra details required to display, so they're added here
-            email: string;
-            role: OrganizationUserType;
-            status: OrganizationUserStatusType;
-          }
-      );
+  /**
+   * Optional permission that will be rendered for this
+   * item if it set to readonly.
+   */
+  readonlyPermission?: CollectionPermission;
+} & (
+    | {
+        type: AccessItemType.Collection;
+        viaGroupName?: string;
+      }
+    | {
+        type: AccessItemType.Group;
+      }
+    | {
+        type: AccessItemType.Member; // Members have a few extra details required to display, so they're added here
+        email: string;
+        role: OrganizationUserType;
+        status: OrganizationUserStatusType;
+      }
+  );
 
 /**
  * A type that is emitted as a value for the ngControl
@@ -82,7 +83,9 @@ export type AccessItemValue = {
  * @param value
  */
 export const convertToPermission = (value: CollectionAccessSelectionView) => {
-  if (value.readOnly) {
+  if (value.manage) {
+    return CollectionPermission.Manage;
+  } else if (value.readOnly) {
     return value.hidePasswords ? CollectionPermission.ViewExceptPass : CollectionPermission.View;
   } else {
     return value.hidePasswords ? CollectionPermission.EditExceptPass : CollectionPermission.Edit;
@@ -91,7 +94,7 @@ export const convertToPermission = (value: CollectionAccessSelectionView) => {
 
 /**
  * Converts an AccessItemValue back into a CollectionAccessView class using the CollectionPermission
- * to determine the values for `readOnly` and `hidePassword`
+ * to determine the values for `manage`, `readOnly`, and `hidePassword`
  * @param value
  */
 export const convertToSelectionView = (value: AccessItemValue) => {
@@ -99,6 +102,7 @@ export const convertToSelectionView = (value: AccessItemValue) => {
     id: value.id,
     readOnly: readOnly(value.permission),
     hidePasswords: hidePassword(value.permission),
+    manage: value.permission === CollectionPermission.Manage,
   });
 };
 
@@ -107,3 +111,29 @@ const readOnly = (perm: CollectionPermission) =>
 
 const hidePassword = (perm: CollectionPermission) =>
   [CollectionPermission.ViewExceptPass, CollectionPermission.EditExceptPass].includes(perm);
+
+export function mapGroupToAccessItemView(group: GroupView): AccessItemView {
+  return {
+    id: group.id,
+    type: AccessItemType.Group,
+    listName: group.name,
+    labelName: group.name,
+    accessAllItems: group.accessAll,
+    readonly: group.accessAll,
+  };
+}
+
+// TODO: Use view when user apis are migrated to a service
+export function mapUserToAccessItemView(user: OrganizationUserUserDetailsResponse): AccessItemView {
+  return {
+    id: user.id,
+    type: AccessItemType.Member,
+    email: user.email,
+    role: user.type,
+    listName: user.name?.length > 0 ? `${user.name} (${user.email})` : user.email,
+    labelName: user.name ?? user.email,
+    status: user.status,
+    accessAllItems: user.accessAll,
+    readonly: user.accessAll,
+  };
+}

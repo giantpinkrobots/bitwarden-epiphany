@@ -1,4 +1,4 @@
-import { awaitAsync } from "@bitwarden/angular/../test-utils";
+import { awaitAsync } from "@bitwarden/common/../spec/utils";
 import { mock, MockProxy } from "jest-mock-extended";
 import { BehaviorSubject, ReplaySubject } from "rxjs";
 
@@ -55,7 +55,7 @@ describe("session syncer", () => {
           sessionKey,
           initializeAs: "object",
           initializer: () => null,
-        })
+        }),
       ).toBeDefined();
       expect(
         new SessionSyncer(behaviorSubject, storageService, {
@@ -63,7 +63,7 @@ describe("session syncer", () => {
           sessionKey,
           initializer: (s: any) => s,
           initializeAs: "object",
-        })
+        }),
       ).toBeDefined();
     });
     it("should throw if neither ctor or initializer is provided", () => {

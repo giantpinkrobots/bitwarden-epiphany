@@ -6,6 +6,8 @@
     }
   },
   "flags": {
-    "showPasswordless": true
+    "showPasswordless": true,
+    "enableCipherKeyEncryption": false,
+    "accountSwitching": true
   }
 }

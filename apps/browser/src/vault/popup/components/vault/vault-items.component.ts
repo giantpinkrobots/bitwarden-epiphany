@@ -7,22 +7,21 @@ import { VaultItemsComponent as BaseVaultItemsComponent } from "@bitwarden/angul
 import { VaultFilter } from "@bitwarden/angular/vault/vault-filter/models/vault-filter.model";
 import { SearchService } from "@bitwarden/common/abstractions/search.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
-import { TreeNode } from "@bitwarden/common/models/domain/tree-node";
 import { BroadcasterService } from "@bitwarden/common/platform/abstractions/broadcaster.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CollectionService } from "@bitwarden/common/vault/abstractions/collection.service";
-import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
-import { CipherType } from "@bitwarden/common/vault/enums/cipher-type";
+import { CipherType } from "@bitwarden/common/vault/enums";
+import { TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { CollectionView } from "@bitwarden/common/vault/models/view/collection.view";
 import { FolderView } from "@bitwarden/common/vault/models/view/folder.view";
 
 import { BrowserComponentState } from "../../../../models/browserComponentState";
 import { BrowserApi } from "../../../../platform/browser/browser-api";
+import BrowserPopupUtils from "../../../../platform/popup/browser-popup-utils";
 import { BrowserStateService } from "../../../../platform/services/abstractions/browser-state.service";
-import { PopupUtilsService } from "../../../../popup/services/popup-utils.service";
 import { VaultFilterService } from "../../../services/vault-filter.service";
 
 const ComponentId = "VaultItemsComponent";
@@ -61,13 +60,11 @@ export class VaultItemsComponent extends BaseVaultItemsComponent implements OnIn
     private broadcasterService: BroadcasterService,
     private changeDetectorRef: ChangeDetectorRef,
     private stateService: BrowserStateService,
-    private popupUtils: PopupUtilsService,
     private i18nService: I18nService,
-    private folderService: FolderService,
     private collectionService: CollectionService,
     private platformUtilsService: PlatformUtilsService,
     cipherService: CipherService,
-    private vaultFilterService: VaultFilterService
+    private vaultFilterService: VaultFilterService,
   ) {
     super(searchService, cipherService);
     this.applySavedState =
@@ -146,7 +143,7 @@ export class VaultItemsComponent extends BaseVaultItemsComponent implements OnIn
               : null;
         }
         await this.load(
-          (c) => c.collectionIds != null && c.collectionIds.indexOf(this.collectionId) > -1
+          (c) => c.collectionIds != null && c.collectionIds.indexOf(this.collectionId) > -1,
         );
       } else {
         this.showVaultFilter = true;
@@ -155,11 +152,10 @@ export class VaultItemsComponent extends BaseVaultItemsComponent implements OnIn
       }
 
       if (this.applySavedState && this.state != null) {
-        window.setTimeout(
-          () =>
-            this.popupUtils.setContentScrollY(window, this.state.scrollY, this.scrollingContainer),
-          0
-        );
+        BrowserPopupUtils.setContentScrollY(window, this.state.scrollY, {
+          delay: 0,
+          containerSelector: this.scrollingContainer,
+        });
       }
       await this.stateService.setBrowserVaultItemsComponentState(null);
     });
@@ -219,7 +215,7 @@ export class VaultItemsComponent extends BaseVaultItemsComponent implements OnIn
     this.preventSelected = true;
     await this.cipherService.updateLastLaunchedDate(cipher.id);
     BrowserApi.createNewTab(cipher.login.launchUri);
-    if (this.popupUtils.inPopup(window)) {
+    if (BrowserPopupUtils.inPopup(window)) {
       BrowserApi.closePopup(window);
     }
   }
@@ -288,7 +284,7 @@ export class VaultItemsComponent extends BaseVaultItemsComponent implements OnIn
 
   private async saveState() {
     this.state = {
-      scrollY: this.popupUtils.getContentScrollY(window, this.scrollingContainer),
+      scrollY: BrowserPopupUtils.getContentScrollY(window, this.scrollingContainer),
       searchText: this.searchText,
     };
     await this.stateService.setBrowserVaultItemsComponentState(this.state);

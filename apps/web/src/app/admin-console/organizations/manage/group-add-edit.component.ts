@@ -3,10 +3,11 @@ import { ChangeDetectorRef, Component, Inject, OnDestroy, OnInit } from "@angula
 import { FormBuilder, Validators } from "@angular/forms";
 import { catchError, combineLatest, from, map, of, Subject, switchMap, takeUntil } from "rxjs";
 
-import { DialogServiceAbstraction, SimpleDialogType } from "@bitwarden/angular/services/dialog";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
-import { OrganizationUserService } from "@bitwarden/common/abstractions/organization-user/organization-user.service";
+import { OrganizationUserService } from "@bitwarden/common/admin-console/abstractions/organization-user/organization-user.service";
+import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { ConfigServiceAbstraction } from "@bitwarden/common/platform/abstractions/config/config.service.abstraction";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
@@ -14,6 +15,7 @@ import { CollectionService } from "@bitwarden/common/vault/abstractions/collecti
 import { CollectionData } from "@bitwarden/common/vault/models/data/collection.data";
 import { Collection } from "@bitwarden/common/vault/models/domain/collection";
 import { CollectionDetailsResponse } from "@bitwarden/common/vault/models/response/collection.response";
+import { DialogService } from "@bitwarden/components";
 
 import { InternalGroupService as GroupService, GroupView } from "../core";
 import {
@@ -64,12 +66,12 @@ export enum GroupAddEditDialogResultType {
  * @param config Configuration for the dialog
  */
 export const openGroupAddEditDialog = (
-  dialogService: DialogServiceAbstraction,
-  config: DialogConfig<GroupAddEditDialogParams>
+  dialogService: DialogService,
+  config: DialogConfig<GroupAddEditDialogParams>,
 ) => {
   return dialogService.open<GroupAddEditDialogResultType, GroupAddEditDialogParams>(
     GroupAddEditComponent,
-    config
+    config,
   );
 };
 
@@ -78,6 +80,11 @@ export const openGroupAddEditDialog = (
   templateUrl: "group-add-edit.component.html",
 })
 export class GroupAddEditComponent implements OnInit, OnDestroy {
+  protected flexibleCollectionsEnabled$ = this.configService.getFeatureFlag$(
+    FeatureFlag.FlexibleCollections,
+    false,
+  );
+
   protected PermissionMode = PermissionMode;
   protected ResultType = GroupAddEditDialogResultType;
 
@@ -113,9 +120,9 @@ export class GroupAddEditComponent implements OnInit, OnDestroy {
         return from(
           this.collectionService.decryptMany(
             response.data.map(
-              (r) => new Collection(new CollectionData(r as CollectionDetailsResponse))
-            )
-          )
+              (r) => new Collection(new CollectionData(r as CollectionDetailsResponse)),
+            ),
+          ),
         );
       }),
       map((collections) =>
@@ -124,8 +131,8 @@ export class GroupAddEditComponent implements OnInit, OnDestroy {
           type: AccessItemType.Collection,
           labelName: c.name,
           listName: c.name,
-        }))
-      )
+        })),
+      ),
     );
   }
 
@@ -140,8 +147,8 @@ export class GroupAddEditComponent implements OnInit, OnDestroy {
           listName: m.name?.length > 0 ? `${m.name} (${m.email})` : m.email,
           labelName: m.name || m.email,
           status: m.status,
-        }))
-      )
+        })),
+      ),
     );
   }
 
@@ -165,7 +172,7 @@ export class GroupAddEditComponent implements OnInit, OnDestroy {
           this.logService.error(e.toString());
         }
         return of(undefined);
-      })
+      }),
     );
   }
 
@@ -181,7 +188,8 @@ export class GroupAddEditComponent implements OnInit, OnDestroy {
     private logService: LogService,
     private formBuilder: FormBuilder,
     private changeDetectorRef: ChangeDetectorRef,
-    private dialogService: DialogServiceAbstraction
+    private dialogService: DialogService,
+    private configService: ConfigServiceAbstraction,
   ) {
     this.tabIndex = params.initialTab ?? GroupAddEditTabType.Info;
   }
@@ -235,7 +243,7 @@ export class GroupAddEditComponent implements OnInit, OnDestroy {
         this.platformUtilsService.showToast(
           "error",
           null,
-          this.i18nService.t("fieldOnTabRequiresAttention", this.i18nService.t("groupInfo"))
+          this.i18nService.t("fieldOnTabRequiresAttention", this.i18nService.t("groupInfo")),
         );
       }
       return;
@@ -259,7 +267,7 @@ export class GroupAddEditComponent implements OnInit, OnDestroy {
     this.platformUtilsService.showToast(
       "success",
       null,
-      this.i18nService.t(this.editMode ? "editedGroupId" : "createdGroupId", formValue.name)
+      this.i18nService.t(this.editMode ? "editedGroupId" : "createdGroupId", formValue.name),
     );
 
     this.dialogRef.close(GroupAddEditDialogResultType.Saved);
@@ -273,7 +281,7 @@ export class GroupAddEditComponent implements OnInit, OnDestroy {
     const confirmed = await this.dialogService.openSimpleDialog({
       title: this.group.name,
       content: { key: "deleteGroupConfirmation" },
-      type: SimpleDialogType.WARNING,
+      type: "warning",
     });
     if (!confirmed) {
       return false;
@@ -284,7 +292,7 @@ export class GroupAddEditComponent implements OnInit, OnDestroy {
     this.platformUtilsService.showToast(
       "success",
       null,
-      this.i18nService.t("deletedGroupId", this.group.name)
+      this.i18nService.t("deletedGroupId", this.group.name),
     );
     this.dialogRef.close(GroupAddEditDialogResultType.Deleted);
   };

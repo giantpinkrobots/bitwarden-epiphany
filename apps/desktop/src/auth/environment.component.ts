@@ -1,6 +1,6 @@
 import { Component } from "@angular/core";
 
-import { EnvironmentComponent as BaseEnvironmentComponent } from "@bitwarden/angular/components/environment.component";
+import { EnvironmentComponent as BaseEnvironmentComponent } from "@bitwarden/angular/auth/components/environment.component";
 import { ModalService } from "@bitwarden/angular/services/modal.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
@@ -15,7 +15,7 @@ export class EnvironmentComponent extends BaseEnvironmentComponent {
     platformUtilsService: PlatformUtilsService,
     environmentService: EnvironmentService,
     i18nService: I18nService,
-    modalService: ModalService
+    modalService: ModalService,
   ) {
     super(platformUtilsService, environmentService, i18nService, modalService);
   }

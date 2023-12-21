@@ -1,3 +1,5 @@
+import { Observable } from "rxjs";
+
 import { DeviceType } from "@bitwarden/common/enums";
 
 import { TabMessage } from "../../types/tab-messages";
@@ -17,6 +19,78 @@ export class BrowserApi {
     return chrome.runtime.getManifest().manifest_version;
   }
 
+  /**
+   * Gets the current window or the window with the given id.
+   *
+   * @param windowId - The id of the window to get. If not provided, the current window is returned.
+   */
+  static async getWindow(windowId?: number): Promise<chrome.windows.Window> {
+    if (!windowId) {
+      return BrowserApi.getCurrentWindow();
+    }
+
+    return await BrowserApi.getWindowById(windowId);
+  }
+
+  /**
+   * Gets the currently active browser window.
+   */
+  static async getCurrentWindow(): Promise<chrome.windows.Window> {
+    return new Promise((resolve) => chrome.windows.getCurrent({ populate: true }, resolve));
+  }
+
+  /**
+   * Gets the window with the given id.
+   *
+   * @param windowId - The id of the window to get.
+   */
+  static async getWindowById(windowId: number): Promise<chrome.windows.Window> {
+    return new Promise((resolve) => chrome.windows.get(windowId, { populate: true }, resolve));
+  }
+
+  static async createWindow(options: chrome.windows.CreateData): Promise<chrome.windows.Window> {
+    return new Promise((resolve) =>
+      chrome.windows.create(options, (window) => {
+        resolve(window);
+      }),
+    );
+  }
+
+  /**
+   * Removes the window with the given id.
+   *
+   * @param windowId - The id of the window to remove.
+   */
+  static async removeWindow(windowId: number): Promise<void> {
+    return new Promise((resolve) => chrome.windows.remove(windowId, () => resolve()));
+  }
+
+  /**
+   * Updates the properties of the window with the given id.
+   *
+   * @param windowId - The id of the window to update.
+   * @param options - The window properties to update.
+   */
+  static async updateWindowProperties(
+    windowId: number,
+    options: chrome.windows.UpdateInfo,
+  ): Promise<void> {
+    return new Promise((resolve) =>
+      chrome.windows.update(windowId, options, () => {
+        resolve();
+      }),
+    );
+  }
+
+  /**
+   * Focuses the window with the given id.
+   *
+   * @param windowId - The id of the window to focus.
+   */
+  static async focusWindow(windowId: number) {
+    await BrowserApi.updateWindowProperties(windowId, { focused: true });
+  }
+
   static async getTabFromCurrentWindowId(): Promise<chrome.tabs.Tab> | null {
     return await BrowserApi.tabsQueryFirst({
       active: true,
@@ -24,11 +98,20 @@ export class BrowserApi {
     });
   }
 
-  static async getTab(tabId: number) {
-    if (tabId == null) {
+  static async getTab(tabId: number): Promise<chrome.tabs.Tab> | null {
+    if (!tabId) {
       return null;
     }
-    return await chrome.tabs.get(tabId);
+
+    if (BrowserApi.manifestVersion === 3) {
+      return await chrome.tabs.get(tabId);
+    }
+
+    return new Promise((resolve) =>
+      chrome.tabs.get(tabId, (tab) => {
+        resolve(tab);
+      }),
+    );
   }
 
   static async getTabFromCurrentWindow(): Promise<chrome.tabs.Tab> | null {
@@ -64,7 +147,7 @@ export class BrowserApi {
   static tabSendMessageData(
     tab: chrome.tabs.Tab,
     command: string,
-    data: any = null
+    data: any = null,
   ): Promise<void> {
     const obj: any = {
       command: command,
@@ -80,7 +163,7 @@ export class BrowserApi {
   static async tabSendMessage<T>(
     tab: chrome.tabs.Tab,
     obj: T,
-    options: chrome.tabs.MessageSendOptions = null
+    options: chrome.tabs.MessageSendOptions = null,
   ): Promise<void> {
     if (!tab || !tab.id) {
       return;
@@ -100,7 +183,7 @@ export class BrowserApi {
     tabId: number,
     message: TabMessage,
     options?: chrome.tabs.MessageSendOptions,
-    responseCallback?: (response: T) => void
+    responseCallback?: (response: T) => void,
   ) {
     chrome.tabs.sendMessage<TabMessage, T>(tabId, message, options, responseCallback);
   }
@@ -110,6 +193,9 @@ export class BrowserApi {
   }
 
   static async onWindowCreated(callback: (win: chrome.windows.Window) => any) {
+    // FIXME: Make sure that is does not cause a memory leak in Safari or use BrowserApi.AddListener
+    // and test that it doesn't break.
+    // eslint-disable-next-line no-restricted-syntax
     return chrome.windows.onCreated.addListener(callback);
   }
 
@@ -131,69 +217,107 @@ export class BrowserApi {
 
   static createNewTab(url: string, active = true): Promise<chrome.tabs.Tab> {
     return new Promise((resolve) =>
-      chrome.tabs.create({ url: url, active: active }, (tab) => resolve(tab))
+      chrome.tabs.create({ url: url, active: active }, (tab) => resolve(tab)),
     );
   }
 
-  static async focusWindow(windowId: number) {
-    await chrome.windows.update(windowId, { focused: true });
-  }
-
-  static async openBitwardenExtensionTab(relativeUrl: string, active = true) {
-    let url = relativeUrl;
-    if (!relativeUrl.includes("uilocation=tab")) {
-      const fullUrl = chrome.extension.getURL(relativeUrl);
-      const parsedUrl = new URL(fullUrl);
-      parsedUrl.searchParams.set("uilocation", "tab");
-      url = parsedUrl.toString();
-    }
-
-    const createdTab = await this.createNewTab(url, active);
-    this.focusWindow(createdTab.windowId);
-  }
-
-  static async closeBitwardenExtensionTab() {
-    const tabs = await BrowserApi.tabsQuery({
-      active: true,
-      title: "Bitwarden",
-      windowType: "normal",
-      currentWindow: true,
-    });
-
-    if (tabs.length === 0) {
-      return;
-    }
-
-    const tabToClose = tabs[tabs.length - 1];
-    chrome.tabs.remove(tabToClose.id);
-  }
-
-  private static registeredMessageListeners: any[] = [];
+  // Keep track of all the events registered in a Safari popup so we can remove
+  // them when the popup gets unloaded, otherwise we cause a memory leak
+  private static trackedChromeEventListeners: [
+    event: chrome.events.Event<(...args: unknown[]) => unknown>,
+    callback: (...args: unknown[]) => unknown,
+  ][] = [];
 
   static messageListener(
     name: string,
-    callback: (message: any, sender: chrome.runtime.MessageSender, response: any) => void
+    callback: (
+      message: any,
+      sender: chrome.runtime.MessageSender,
+      sendResponse: any,
+    ) => boolean | void,
   ) {
-    chrome.runtime.onMessage.addListener(callback);
+    BrowserApi.addListener(chrome.runtime.onMessage, callback);
+  }
 
-    // Keep track of all the events registered in a Safari popup so we can remove
-    // them when the popup gets unloaded, otherwise we cause a memory leak
-    if (BrowserApi.isSafariApi && !BrowserApi.isBackgroundPage(window)) {
-      BrowserApi.registeredMessageListeners.push(callback);
-
-      // The MDN recommend using 'visibilitychange' but that event is fired any time the popup window is obscured as well
-      // 'pagehide' works just like 'unload' but is compatible with the back/forward cache, so we prefer using that one
-      window.onpagehide = () => {
-        for (const callback of BrowserApi.registeredMessageListeners) {
-          chrome.runtime.onMessage.removeListener(callback);
-        }
+  static messageListener$() {
+    return new Observable<unknown>((subscriber) => {
+      const handler = (message: unknown) => {
+        subscriber.next(message);
       };
+
+      BrowserApi.addListener(chrome.runtime.onMessage, handler);
+
+      return () => BrowserApi.removeListener(chrome.runtime.onMessage, handler);
+    });
+  }
+
+  static storageChangeListener(
+    callback: Parameters<typeof chrome.storage.onChanged.addListener>[0],
+  ) {
+    BrowserApi.addListener(chrome.storage.onChanged, callback);
+  }
+
+  /**
+   * Adds a callback to the given chrome event in a cross-browser platform manner.
+   *
+   * **Important:** All event listeners in the browser extension popup context must
+   * use this instead of the native APIs to handle unsubscribing from Safari properly.
+   *
+   * @param event - The event in which to add the listener to.
+   * @param callback - The callback you want registered onto the event.
+   */
+  static addListener<T extends (...args: readonly unknown[]) => unknown>(
+    event: chrome.events.Event<T>,
+    callback: T,
+  ) {
+    event.addListener(callback);
+
+    if (BrowserApi.isSafariApi && !BrowserApi.isBackgroundPage(window)) {
+      BrowserApi.trackedChromeEventListeners.push([event, callback]);
+      BrowserApi.setupUnloadListeners();
     }
+  }
+
+  /**
+   * Removes a callback from the given chrome event in a cross-browser platform manner.
+   * @param event - The event in which to remove the listener from.
+   * @param callback - The callback you want removed from the event.
+   */
+  static removeListener<T extends (...args: readonly unknown[]) => unknown>(
+    event: chrome.events.Event<T>,
+    callback: T,
+  ) {
+    event.removeListener(callback);
+
+    if (BrowserApi.isSafariApi && !BrowserApi.isBackgroundPage(window)) {
+      const index = BrowserApi.trackedChromeEventListeners.findIndex(([_event, eventListener]) => {
+        return eventListener == callback;
+      });
+      if (index !== -1) {
+        BrowserApi.trackedChromeEventListeners.splice(index, 1);
+      }
+    }
+  }
+
+  // Setup the event to destroy all the listeners when the popup gets unloaded in Safari, otherwise we get a memory leak
+  private static setupUnloadListeners() {
+    // The MDN recommend using 'visibilitychange' but that event is fired any time the popup window is obscured as well
+    // 'pagehide' works just like 'unload' but is compatible with the back/forward cache, so we prefer using that one
+    window.onpagehide = () => {
+      for (const [event, callback] of BrowserApi.trackedChromeEventListeners) {
+        event.removeListener(callback);
+      }
+    };
   }
 
   static sendMessage(subscriber: string, arg: any = {}) {
     const message = Object.assign({}, { command: subscriber }, arg);
     return chrome.runtime.sendMessage(message);
+  }
+
+  static sendMessageWithResponse<TResponse>(subscriber: string, arg: any = {}) {
+    const message = Object.assign({}, { command: subscriber }, arg);
+    return new Promise<TResponse>((resolve) => chrome.runtime.sendMessage(message, resolve));
   }
 
   static async focusTab(tabId: number) {
@@ -215,7 +339,7 @@ export class BrowserApi {
     return process.env.ENV !== "production";
   }
 
-  static getUILanguage(win: Window) {
+  static getUILanguage() {
     return chrome.i18n.getUILanguage();
   }
 
@@ -250,9 +374,20 @@ export class BrowserApi {
     if (BrowserApi.isWebExtensionsApi) {
       return browser.permissions.request(permission);
     }
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       chrome.permissions.request(permission, resolve);
     });
+  }
+
+  /**
+   * Checks if the user has provided the given permissions to the extension.
+   *
+   * @param permissions - The permissions to check.
+   */
+  static async permissionsGranted(permissions: string[]): Promise<boolean> {
+    return new Promise((resolve) =>
+      chrome.permissions.contains({ permissions }, (result) => resolve(result)),
+    );
   }
 
   static getPlatformInfo(): Promise<browser.runtime.PlatformInfo | chrome.runtime.PlatformInfo> {
@@ -269,12 +404,39 @@ export class BrowserApi {
   }
 
   static getSidebarAction(
-    win: Window & typeof globalThis
+    win: Window & typeof globalThis,
   ): OperaSidebarAction | FirefoxSidebarAction | null {
     const deviceType = BrowserPlatformUtilsService.getDevice(win);
     if (deviceType !== DeviceType.FirefoxExtension && deviceType !== DeviceType.OperaExtension) {
       return null;
     }
     return win.opr?.sidebarAction || browser.sidebarAction;
+  }
+
+  /**
+   * Extension API helper method used to execute a script in a tab.
+   * @see https://developer.chrome.com/docs/extensions/reference/tabs/#method-executeScript
+   * @param {number} tabId
+   * @param {chrome.tabs.InjectDetails} details
+   * @returns {Promise<unknown>}
+   */
+  static executeScriptInTab(tabId: number, details: chrome.tabs.InjectDetails) {
+    if (BrowserApi.manifestVersion === 3) {
+      return chrome.scripting.executeScript({
+        target: {
+          tabId: tabId,
+          allFrames: details.allFrames,
+          frameIds: details.frameId ? [details.frameId] : null,
+        },
+        files: details.file ? [details.file] : null,
+        injectImmediately: details.runAt === "document_start",
+      });
+    }
+
+    return new Promise((resolve) => {
+      chrome.tabs.executeScript(tabId, details, (result) => {
+        resolve(result);
+      });
+    });
   }
 }

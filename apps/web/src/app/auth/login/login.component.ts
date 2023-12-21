@@ -1,12 +1,11 @@
-import { Component, NgZone, OnDestroy, OnInit } from "@angular/core";
+import { Component, NgZone, OnInit } from "@angular/core";
 import { FormBuilder } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
-import { Subject, takeUntil } from "rxjs";
+import { takeUntil } from "rxjs";
 import { first } from "rxjs/operators";
 
 import { LoginComponent as BaseLoginComponent } from "@bitwarden/angular/auth/components/login.component";
 import { FormValidationErrorsService } from "@bitwarden/angular/platform/abstractions/form-validation-errors.service";
-import { DevicesApiServiceAbstraction } from "@bitwarden/common/abstractions/devices/devices-api.service.abstraction";
 import { PolicyApiServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/policy/policy-api.service.abstraction";
 import { InternalPolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { PolicyData } from "@bitwarden/common/admin-console/models/data/policy.data";
@@ -14,7 +13,10 @@ import { MasterPasswordPolicyOptions } from "@bitwarden/common/admin-console/mod
 import { Policy } from "@bitwarden/common/admin-console/models/domain/policy";
 import { PolicyResponse } from "@bitwarden/common/admin-console/models/response/policy.response";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
+import { DevicesApiServiceAbstraction } from "@bitwarden/common/auth/abstractions/devices-api.service.abstraction";
 import { LoginService } from "@bitwarden/common/auth/abstractions/login.service";
+import { WebAuthnLoginServiceAbstraction } from "@bitwarden/common/auth/abstractions/webauthn/webauthn-login.service.abstraction";
+import { AuthResult } from "@bitwarden/common/auth/models/domain/auth-result";
 import { ListResponse } from "@bitwarden/common/models/response/list.response";
 import { AppIdService } from "@bitwarden/common/platform/abstractions/app-id.service";
 import { CryptoFunctionService } from "@bitwarden/common/platform/abstractions/crypto-function.service";
@@ -33,13 +35,12 @@ import { RouterService, StateService } from "../../core";
   selector: "app-login",
   templateUrl: "login.component.html",
 })
-export class LoginComponent extends BaseLoginComponent implements OnInit, OnDestroy {
+// eslint-disable-next-line rxjs-angular/prefer-takeuntil
+export class LoginComponent extends BaseLoginComponent implements OnInit {
   showResetPasswordAutoEnrollWarning = false;
   enforcedPasswordPolicyOptions: MasterPasswordPolicyOptions;
   policies: ListResponse<PolicyResponse>;
   showPasswordless = false;
-
-  private destroy$ = new Subject<void>();
 
   constructor(
     devicesApiService: DevicesApiServiceAbstraction,
@@ -62,7 +63,8 @@ export class LoginComponent extends BaseLoginComponent implements OnInit, OnDest
     private routerService: RouterService,
     formBuilder: FormBuilder,
     formValidationErrorService: FormValidationErrorsService,
-    loginService: LoginService
+    loginService: LoginService,
+    webAuthnLoginService: WebAuthnLoginServiceAbstraction,
   ) {
     super(
       devicesApiService,
@@ -80,7 +82,8 @@ export class LoginComponent extends BaseLoginComponent implements OnInit, OnDest
       formBuilder,
       formValidationErrorService,
       route,
-      loginService
+      loginService,
+      webAuthnLoginService,
     );
     this.onSuccessfulLogin = async () => {
       this.messagingService.send("setFullWidth");
@@ -119,7 +122,7 @@ export class LoginComponent extends BaseLoginComponent implements OnInit, OnDest
           invite.organizationId,
           invite.token,
           invite.email,
-          invite.organizationUserId
+          invite.organizationUserId,
         );
         policyList = this.policyService.mapPoliciesFromToken(this.policies);
       } catch (e) {
@@ -129,7 +132,7 @@ export class LoginComponent extends BaseLoginComponent implements OnInit, OnDest
       if (policyList != null) {
         const resetPasswordPolicy = this.policyService.getResetPasswordPolicyOptions(
           policyList,
-          invite.organizationId
+          invite.organizationId,
         );
         // Set to true if policy enabled and auto-enroll enabled
         this.showResetPasswordAutoEnrollWarning =
@@ -145,11 +148,6 @@ export class LoginComponent extends BaseLoginComponent implements OnInit, OnDest
     }
   }
 
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-  }
-
   async goAfterLogIn() {
     const masterPassword = this.formGroup.value.masterPassword;
 
@@ -157,7 +155,7 @@ export class LoginComponent extends BaseLoginComponent implements OnInit, OnDest
     if (this.enforcedPasswordPolicyOptions != null) {
       const strengthResult = this.passwordStrengthService.getPasswordStrength(
         masterPassword,
-        this.formGroup.value.email
+        this.formGroup.value.email,
       );
       const masterPasswordScore = strengthResult == null ? null : strengthResult.score;
 
@@ -166,7 +164,7 @@ export class LoginComponent extends BaseLoginComponent implements OnInit, OnDest
         !this.policyService.evaluateMasterPassword(
           masterPasswordScore,
           masterPassword,
-          this.enforcedPasswordPolicyOptions
+          this.enforcedPasswordPolicyOptions,
         )
       ) {
         const policiesData: { [id: string]: PolicyData } = {};
@@ -177,13 +175,8 @@ export class LoginComponent extends BaseLoginComponent implements OnInit, OnDest
       }
     }
 
-    const previousUrl = this.routerService.getPreviousUrl();
-    if (previousUrl) {
-      this.router.navigateByUrl(previousUrl);
-    } else {
-      this.loginService.clearValues();
-      this.router.navigate([this.successRoute]);
-    }
+    this.loginService.clearValues();
+    this.router.navigate([this.successRoute]);
   }
 
   goToHint() {
@@ -209,5 +202,13 @@ export class LoginComponent extends BaseLoginComponent implements OnInit, OnDest
       await this.stateService.setRememberedEmail(null);
     }
     await super.submit(false);
+  }
+
+  protected override handleMigrateEncryptionKey(result: AuthResult): boolean {
+    if (!result.requiresEncryptionKeyMigration) {
+      return false;
+    }
+    this.router.navigate(["migrate-legacy-encryption"]);
+    return true;
   }
 }

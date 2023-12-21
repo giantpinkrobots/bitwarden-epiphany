@@ -1,25 +1,10 @@
 import { Jsonify } from "type-fest";
 
-import { UriMatchType } from "../../../enums";
 import { View } from "../../../models/view/view";
+import { SafeUrls } from "../../../platform/misc/safe-urls";
 import { Utils } from "../../../platform/misc/utils";
+import { UriMatchType } from "../../enums";
 import { LoginUri } from "../domain/login-uri";
-
-const CanLaunchWhitelist = [
-  "https://",
-  "http://",
-  "ssh://",
-  "ftp://",
-  "sftp://",
-  "irc://",
-  "vnc://",
-  // https://docs.microsoft.com/en-us/windows-server/remote/remote-desktop-services/clients/remote-desktop-uri
-  "rdp://", // Legacy RDP URI scheme
-  "ms-rd:", // Preferred RDP URI scheme
-  "chrome://",
-  "iosapp://",
-  "androidapp://",
-];
 
 export class LoginUriView implements View {
   match: UriMatchType = null;
@@ -108,15 +93,10 @@ export class LoginUriView implements View {
       return this._canLaunch;
     }
     if (this.uri != null && this.match !== UriMatchType.RegularExpression) {
-      const uri = this.launchUri;
-      for (let i = 0; i < CanLaunchWhitelist.length; i++) {
-        if (uri.indexOf(CanLaunchWhitelist[i]) === 0) {
-          this._canLaunch = true;
-          return this._canLaunch;
-        }
-      }
+      this._canLaunch = SafeUrls.canLaunch(this.launchUri);
+    } else {
+      this._canLaunch = false;
     }
-    this._canLaunch = false;
     return this._canLaunch;
   }
 
@@ -133,7 +113,7 @@ export class LoginUriView implements View {
   matchesUri(
     targetUri: string,
     equivalentDomains: Set<string>,
-    defaultUriMatch: UriMatchType = null
+    defaultUriMatch: UriMatchType = null,
   ): boolean {
     if (!this.uri || !targetUri) {
       return false;

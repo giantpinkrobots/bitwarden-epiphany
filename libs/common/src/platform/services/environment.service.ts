@@ -1,15 +1,17 @@
-import { concatMap, Observable, Subject } from "rxjs";
+import { concatMap, distinctUntilChanged, Observable, ReplaySubject } from "rxjs";
 
 import { EnvironmentUrls } from "../../auth/models/domain/environment-urls";
 import {
   EnvironmentService as EnvironmentServiceAbstraction,
   Region,
+  RegionDomain,
   Urls,
 } from "../abstractions/environment.service";
 import { StateService } from "../abstractions/state.service";
+import { Utils } from "../misc/utils";
 
 export class EnvironmentService implements EnvironmentServiceAbstraction {
-  private readonly urlsSubject = new Subject<void>();
+  private readonly urlsSubject = new ReplaySubject<void>(1);
   urls: Observable<void> = this.urlsSubject.asObservable();
   selectedRegion?: Region;
   initialized = false;
@@ -50,12 +52,14 @@ export class EnvironmentService implements EnvironmentServiceAbstraction {
   constructor(private stateService: StateService) {
     this.stateService.activeAccount$
       .pipe(
+        // Use == here to not trigger on undefined -> null transition
+        distinctUntilChanged((oldUserId: string, newUserId: string) => oldUserId == newUserId),
         concatMap(async () => {
           if (!this.initialized) {
             return;
           }
           await this.setUrlsFromStorage();
-        })
+        }),
       )
       .subscribe();
   }
@@ -281,6 +285,28 @@ export class EnvironmentService implements EnvironmentServiceAbstraction {
       this.notificationsUrl == null &&
       this.eventsUrl == null
     );
+  }
+
+  async getHost(userId?: string) {
+    const region = await this.getRegion(userId ? userId : null);
+
+    switch (region) {
+      case Region.US:
+        return RegionDomain.US;
+      case Region.EU:
+        return RegionDomain.EU;
+      default: {
+        // Environment is self-hosted
+        const envUrls = await this.stateService.getEnvironmentUrls(
+          userId ? { userId: userId } : null,
+        );
+        return Utils.getHost(envUrls.webVault || envUrls.base);
+      }
+    }
+  }
+
+  private async getRegion(userId?: string) {
+    return this.stateService.getRegion(userId ? { userId: userId } : null);
   }
 
   async setRegion(region: Region) {

@@ -1,12 +1,16 @@
 import { Directive, ElementRef, HostListener, Input } from "@angular/core";
 
+import { ClientType } from "@bitwarden/common/enums";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 
 @Directive({
   selector: "[appCopyText]",
 })
 export class CopyTextDirective {
-  constructor(private el: ElementRef, private platformUtilsService: PlatformUtilsService) {}
+  constructor(
+    private el: ElementRef,
+    private platformUtilsService: PlatformUtilsService,
+  ) {}
 
   @Input("appCopyText") copyText: string;
 
@@ -15,6 +19,9 @@ export class CopyTextDirective {
       return;
     }
 
-    this.platformUtilsService.copyToClipboard(this.copyText, { window: window });
+    const timeout = this.platformUtilsService.getClientType() === ClientType.Desktop ? 100 : 0;
+    setTimeout(() => {
+      this.platformUtilsService.copyToClipboard(this.copyText, { window: window });
+    }, timeout);
   }
 }

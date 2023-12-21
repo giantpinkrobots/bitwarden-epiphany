@@ -1,13 +1,12 @@
 import { EnvironmentUrls } from "../../../auth/models/domain/environment-urls";
-import { StateVersion, ThemeType } from "../../../enums";
 import { WindowState } from "../../../models/domain/window-state";
+import { ThemeType } from "../../enums";
 
 export class GlobalState {
   enableAlwaysOnTop?: boolean;
   installedVersion?: string;
   locale?: string;
   organizationInvitation?: any;
-  emergencyAccessInvitation?: any;
   ssoCodeVerifier?: string;
   ssoOrganizationIdentifier?: string;
   ssoState?: string;
@@ -25,7 +24,6 @@ export class GlobalState {
   enableBiometrics?: boolean;
   biometricText?: string;
   noAutoPromptBiometricsText?: string;
-  stateVersion: StateVersion = StateVersion.One;
   environmentUrls: EnvironmentUrls = new EnvironmentUrls();
   enableTray?: boolean;
   enableMinimizeToTray?: boolean;
@@ -37,4 +35,11 @@ export class GlobalState {
   enableBrowserIntegrationFingerprint?: boolean;
   enableDuckDuckGoBrowserIntegration?: boolean;
   region?: string;
+  neverDomains?: { [id: string]: unknown };
+  enablePasskeys?: boolean;
+  disableAddLoginNotification?: boolean;
+  disableChangedPasswordNotification?: boolean;
+  disableContextMenuItem?: boolean;
+  autoFillOverlayVisibility?: number;
+  deepLinkRedirectUrl?: string;
 }

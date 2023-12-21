@@ -3,12 +3,12 @@ import { Component, Inject, OnInit } from "@angular/core";
 import { FormBuilder, Validators } from "@angular/forms";
 import { firstValueFrom, Observable } from "rxjs";
 
-import { DialogServiceAbstraction } from "@bitwarden/angular/services/dialog";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
 import { FolderView } from "@bitwarden/common/vault/models/view/folder.view";
+import { DialogService } from "@bitwarden/components";
 
 export interface BulkMoveDialogParams {
   cipherIds?: string[];
@@ -25,12 +25,12 @@ export enum BulkMoveDialogResult {
  * @param config Configuration for the dialog
  */
 export const openBulkMoveDialog = (
-  dialogService: DialogServiceAbstraction,
-  config: DialogConfig<BulkMoveDialogParams>
+  dialogService: DialogService,
+  config: DialogConfig<BulkMoveDialogParams>,
 ) => {
   return dialogService.open<BulkMoveDialogResult, BulkMoveDialogParams>(
     BulkMoveDialogComponent,
-    config
+    config,
   );
 };
 
@@ -52,7 +52,7 @@ export class BulkMoveDialogComponent implements OnInit {
     private platformUtilsService: PlatformUtilsService,
     private i18nService: I18nService,
     private folderService: FolderService,
-    private formBuilder: FormBuilder
+    private formBuilder: FormBuilder,
   ) {
     this.cipherIds = params.cipherIds ?? [];
   }

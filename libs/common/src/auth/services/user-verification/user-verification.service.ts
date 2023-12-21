@@ -1,11 +1,12 @@
 import { CryptoService } from "../../../platform/abstractions/crypto.service";
 import { I18nService } from "../../../platform/abstractions/i18n.service";
-import { Verification } from "../../../types/verification";
+import { StateService } from "../../../platform/abstractions/state.service";
 import { UserVerificationApiServiceAbstraction } from "../../abstractions/user-verification/user-verification-api.service.abstraction";
 import { UserVerificationService as UserVerificationServiceAbstraction } from "../../abstractions/user-verification/user-verification.service.abstraction";
 import { VerificationType } from "../../enums/verification-type";
 import { SecretVerificationRequest } from "../../models/request/secret-verification.request";
 import { VerifyOTPRequest } from "../../models/request/verify-otp.request";
+import { Verification } from "../../types/verification";
 
 /**
  * Used for general-purpose user verification throughout the app.
@@ -13,9 +14,10 @@ import { VerifyOTPRequest } from "../../models/request/verify-otp.request";
  */
 export class UserVerificationService implements UserVerificationServiceAbstraction {
   constructor(
+    private stateService: StateService,
     private cryptoService: CryptoService,
     private i18nService: I18nService,
-    private userVerificationApiService: UserVerificationApiServiceAbstraction
+    private userVerificationApiService: UserVerificationApiServiceAbstraction,
   ) {}
 
   /**
@@ -27,7 +29,7 @@ export class UserVerificationService implements UserVerificationServiceAbstracti
   async buildRequest<T extends SecretVerificationRequest>(
     verification: Verification,
     requestClass?: new () => T,
-    alreadyHashed?: boolean
+    alreadyHashed?: boolean,
   ) {
     this.validateInput(verification);
 
@@ -37,9 +39,18 @@ export class UserVerificationService implements UserVerificationServiceAbstracti
     if (verification.type === VerificationType.OTP) {
       request.otp = verification.secret;
     } else {
+      let masterKey = await this.cryptoService.getMasterKey();
+      if (!masterKey && !alreadyHashed) {
+        masterKey = await this.cryptoService.makeMasterKey(
+          verification.secret,
+          await this.stateService.getEmail(),
+          await this.stateService.getKdfType(),
+          await this.stateService.getKdfConfig(),
+        );
+      }
       request.masterPasswordHash = alreadyHashed
         ? verification.secret
-        : await this.cryptoService.hashPassword(verification.secret, null);
+        : await this.cryptoService.hashMasterKey(verification.secret, masterKey);
     }
 
     return request;
@@ -61,19 +72,53 @@ export class UserVerificationService implements UserVerificationServiceAbstracti
         throw new Error(this.i18nService.t("invalidVerificationCode"));
       }
     } else {
+      let masterKey = await this.cryptoService.getMasterKey();
+      if (!masterKey) {
+        masterKey = await this.cryptoService.makeMasterKey(
+          verification.secret,
+          await this.stateService.getEmail(),
+          await this.stateService.getKdfType(),
+          await this.stateService.getKdfConfig(),
+        );
+      }
       const passwordValid = await this.cryptoService.compareAndUpdateKeyHash(
         verification.secret,
-        null
+        masterKey,
       );
       if (!passwordValid) {
         throw new Error(this.i18nService.t("invalidMasterPassword"));
       }
+      this.cryptoService.setMasterKey(masterKey);
     }
     return true;
   }
 
   async requestOTP() {
     await this.userVerificationApiService.postAccountRequestOTP();
+  }
+
+  /**
+   * Check if user has master password or can only use passwordless technologies to log in
+   * Note: This only checks the server, not the local state
+   * @param userId The user id to check. If not provided, the current user is used
+   * @returns True if the user has a master password
+   */
+  async hasMasterPassword(userId?: string): Promise<boolean> {
+    const decryptionOptions = await this.stateService.getAccountDecryptionOptions({ userId });
+
+    if (decryptionOptions?.hasMasterPassword != undefined) {
+      return decryptionOptions.hasMasterPassword;
+    }
+
+    // TODO: PM-3518 - Left for backwards compatibility, remove after 2023.12.0
+    return !(await this.stateService.getUsesKeyConnector({ userId }));
+  }
+
+  async hasMasterPasswordAndMasterKeyHash(userId?: string): Promise<boolean> {
+    return (
+      (await this.hasMasterPassword(userId)) &&
+      (await this.cryptoService.getMasterKeyHash()) != null
+    );
   }
 
   private validateInput(verification: Verification) {

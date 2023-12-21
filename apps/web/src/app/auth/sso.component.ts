@@ -4,12 +4,12 @@ import { first } from "rxjs/operators";
 
 import { SsoComponent as BaseSsoComponent } from "@bitwarden/angular/auth/components/sso.component";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
-import { OrgDomainApiServiceAbstraction } from "@bitwarden/common/abstractions/organization-domain/org-domain-api.service.abstraction";
-import { OrganizationDomainSsoDetailsResponse } from "@bitwarden/common/abstractions/organization-domain/responses/organization-domain-sso-details.response";
+import { OrgDomainApiServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/organization-domain/org-domain-api.service.abstraction";
+import { OrganizationDomainSsoDetailsResponse } from "@bitwarden/common/admin-console/abstractions/organization-domain/responses/organization-domain-sso-details.response";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
-import { LoginService } from "@bitwarden/common/auth/abstractions/login.service";
 import { HttpStatusCode } from "@bitwarden/common/enums";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { ConfigServiceAbstraction } from "@bitwarden/common/platform/abstractions/config/config.service.abstraction";
 import { CryptoFunctionService } from "@bitwarden/common/platform/abstractions/crypto-function.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
@@ -38,8 +38,8 @@ export class SsoComponent extends BaseSsoComponent {
     passwordGenerationService: PasswordGenerationServiceAbstraction,
     logService: LogService,
     private orgDomainApiService: OrgDomainApiServiceAbstraction,
-    private loginService: LoginService,
-    private validationService: ValidationService
+    private validationService: ValidationService,
+    configService: ConfigServiceAbstraction,
   ) {
     super(
       authService,
@@ -52,7 +52,8 @@ export class SsoComponent extends BaseSsoComponent {
       cryptoFunctionService,
       environmentService,
       passwordGenerationService,
-      logService
+      logService,
+      configService,
     );
     this.redirectUri = window.location.origin + "/sso-connector.html";
     this.clientId = "web";
@@ -60,21 +61,6 @@ export class SsoComponent extends BaseSsoComponent {
 
   async ngOnInit() {
     super.ngOnInit();
-
-    // if we have an emergency access invite, redirect to emergency access
-    const emergencyAccessInvite = await this.stateService.getEmergencyAccessInvitation();
-    if (emergencyAccessInvite != null) {
-      this.onSuccessfulLoginNavigate = async () => {
-        this.router.navigate(["/accept-emergency"], {
-          queryParams: {
-            id: emergencyAccessInvite.id,
-            name: emergencyAccessInvite.name,
-            email: emergencyAccessInvite.email,
-            token: emergencyAccessInvite.token,
-          },
-        });
-      };
-    }
 
     // eslint-disable-next-line rxjs-angular/prefer-takeuntil, rxjs/no-async-subscribe
     this.route.queryParams.pipe(first()).subscribe(async (qParams) => {
